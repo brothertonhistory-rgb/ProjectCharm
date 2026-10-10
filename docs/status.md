@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 120** (2026-10-10; verified on Emmett's machine — the full suite, **96 timed sections,
+Last updated: **Session 121** (2026-10-10; verified on Emmett's machine — the full suite, **97 timed sections,
+740.9s, `ALL CHECKS PASSED.`**; Phase 112 new, 39 assertions, every predicted number landed). **THE OFFSEASON CAMP**
+(O-73 partly shipped, ★ **C-66**, Emmett 2026-10-10: *"If a guy has very high potential in shooting and every year I
+prioritize that in camp, he could just keep getting better"*): every player arrives with a hidden potential (a tier per
+attribute — a rate, not a ceiling) and a hidden work ethic; every returner goes through a 50-point camp between
+seasons, spent by the computer on his highest potentials, widening and rotating over a career, on camp odds tilted by
+work ethic and minutes; IQ and Discipline grow by age and minutes, capped near arrival. Potential lives in a per-season
+scouting file beside the log (ruling B). Season one unmoved; every season two onward changed. A career saved before
+S121 cannot continue (C-60). Journal S121 has the detail.)
+
+Previous: **Session 120** (2026-10-10; verified on Emmett's machine — the full suite, **96 timed sections,
 2,474.6s, every phase green but Phase 78 A7** (S87's inert mode: who was charged with a foul now also decides foul
 trouble on the free-throw lane); the check fixed and re-run as **`checks 78`, PASS**; Phase 111 new, 35 assertions).
 **THE FREE-THROW LANE** (O-118, Emmett 2026-10-09: *"In college there are 6 players on the lane. 4 for the defense and
@@ -588,6 +598,12 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S121 MOVED NO SEASON-ONE GAME.** Every fingerprint and pinned result stays at the S120 capture (Phase 112 C6a,
+Phases 102–104 green). Every season two onward — a career's, and the `seasons` command's — now plays camped returners;
+nothing pins a season-two value. Stock season two (seeds 20260720 → 20260721): camps bad 683 / normal 1,633 / good 750 /
+breakout 270 over 3,336 returners; the bust table over three camps, flat: athletic or size bigs 32.5%, solid-arriving
+guards 24.0%, everyone else 20.5%. A career saved before S121 has no scouting file and is refused at its next season.
+
 **S120 MOVED EVERY GAME WITH A MISSED LAST FREE THROW (nearly all of them).** The three schedule fingerprints are
 unmoved; the four result fingerprints and every pinned game result are at **the S120 capture** (every-game digest
 `50f297da…`; the old values in journal S120). In the 4,988 fixed-pairing games every possession before a game's first
@@ -766,6 +782,17 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S121 — THE OFFSEASON CAMP (O-73 partly; C-66).** `DevelopmentConfig` (new; 42 dials, aggregated validation,
+  `AttributeOrder` a key, K1's groups in code). `Program.Development.cs` (new): the K5 per-person streams (potential
+  from the arrival season seed and arrival pool index, its first draw the development seed; camp from that seed and the
+  coming season's seed), cohort descriptors, the potential roll, the allocation (widening splits, the rotation), the
+  tilted camp odds, `DevGrowOne`, the camp, the IQ rule, the spurt, the free-throw delta, `DevelopSeason` (index for
+  index, validated by name), `StackedTurnoverAndCamp` (the `seasons` command and Phase 104 both), `CareerDevelop`.
+  `ScoutingFile` (new, `Charm.History`): `season-N.scout` beside the log, written once, nine refusals by name.
+  `RunSeasonCore`: the dials and last season's scouting file read at step 1; the camp after `CareerTurnover`; the
+  bootstrap rolled; the file written; `SecondsByPool` / `TeamGames` captured every game. `ReadCareerPeople` reads minutes
+  off the log. Oracle `tools/development_oracle.py` → `development_golden.json`. Phase 112 new (39); Phase 104 C9d and
+  Phase 105 C3a re-scoped by ruling; Phase 71 registers `Development`; registry 97. Journal S121.
 - **★ S120 — THE FREE-THROW LANE (closes O-118).** `FreeThrowLane` (new): who stands where (lane score half body, half
   rebounding; foul trouble last; ties by slot), the split in totals over the frozen normal lane
   (`FreeThrowLane.OffensiveShare`), who gets it (`OffensiveBoard`, `DefensiveBoard`, `ScrambleFouled`,
@@ -1362,6 +1389,20 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **O-126 — WEEKLY IN-SEASON PRACTICE (S121, ruled for S122).** Small weekly bumps during the season, on top of the
+  summer camp. The next session by Emmett's plan; its own design conversation for the numbers.
+- **O-127 — COACH STYLE SETS THE CAMP (S121).** *"Certain coaches might prioritize certain things heavier"* and the
+  widening/rotation was ruled *"probably a coaching attribute later."* Today every camp is the computer's
+  (`PrioritySplits`, `RepeatAfter`, `RepeatFactor`, the K9 tie-break). Waits on coaches existing (O-57).
+- **O-128 — YOUR OWN PLAYERS' CAMPS (S121, K7).** A training screen that hands `DevRunCamp` a hand-set points map; the
+  validation (≤ 20 an attribute, ≤ 50 in all, funded attributes only) already exists. Waits on a user team.
+- **O-129 — LABELS AFTER GROWTH (S121, K2).** Position, offensive role, defensive plane and scout rank are fixed for a
+  career; a wing who bulks up stays listed a wing. Whether and when to re-derive them is its own ruling.
+- **O-130 — LEAVING EARLY FOR THE PROS (S121).** Every senior leaves and nobody else does; an underclassman who has
+  outgrown college does not. Its own design conversation.
+- **O-131 — WEIGHT IN THE GAME (S121 gate, G1).** Weight is read by no game code (generation only); it now grows in
+  camp (ruled trainable — *"we need to work on weight later for the impact it can have in game"*), so it moves on the
+  page and changes nothing on the floor until this lands.
 - **O-120 — SEAT EVERY BUY GAME IN TIGHT YEARS (S119, C-64).** In five of the fourteen calendar shapes (November 1 a
   Thursday, a Friday, or a Saturday with no leap spring — 2029, 2030, 2035, 2036, 2047) the stock world leaves 7–9
   pairings unseated against 2026's one; 14–16 schools a game short. Every one is *search defect*: a shared free night
@@ -1701,16 +1742,14 @@ chart is PROVISIONAL pending O-6.
   that will become live, and a season written without it could never get it back — but it is currently a
   constant occupying a column. Whoever designs usage hierarchy owns this.
 
-- **O-73 — THE DEVELOPMENT CEILING IS COMPUTED FOR EVERY PLAYER AND THROWN AWAY (opened S90 chores).**
-  `PlayerGenPass3.BuildFromDraws` computes `Latent`, `Current`, `Runway` and `Arrival` for all 4,511
-  men every time a world is built; `GenMapToPlayer` copies the 33-key current card into the 38 ratings
-  and drops the rest on the floor. So the season cannot tell a raw project from a finished senior of
-  the same rating. **Emmett ruled the ceiling OUT of the S90 archive** — *"No, 10 years down the line,
-  it doesn't matter. It should maintain a historical record"* — which settles retention, not the
-  engine gap: a development layer will need this data live, and it is currently discarded one line
-  before the season sees it. Two facts worth not re-deriving: `CurrentSkills` is fully redundant with
-  the stored 38 (`BuildCard` sources all 23 skill keys from `Current`), and `Runway` is exactly
-  `Latent − Current`. The only irreducible value is the latent card.
+- **O-73 — DEVELOPMENT: PARTLY SHIPPED (S121; opened S90 chores as "the ceiling is computed and thrown away").**
+  The offseason camp shipped (C-66): hidden potential and work ethic, a 50-point camp, IQ by age and minutes, the
+  scouting file. **The generator's ceiling stays discarded, by ruling** — its runway points the wrong way for this design
+  (median runway 18–29 in a man's best skill, 2–5 in the rest), so potential is rolled fresh on arrival; the latent
+  card, runway and arrival remain out of the archive (S90) and out of the scouting file. **What remains of the arc is
+  boarded on its own lines:** weekly practice (O-126, S122), coach style (O-127), your own players' camps (O-128),
+  labels after growth (O-129), leaving early (O-130), Weight in the game (O-131). Two facts still worth not
+  re-deriving: `CurrentSkills` is fully redundant with the stored 38, and `Runway` is exactly `Latent − Current`.
 - **~~O-68~~ — RESOLVED WRONG AND REPLACED (S89.1).** S89 recorded S88 as "a dial set with no code".
   That was false: the code existed as UNTRACKED files, invisible to the GitHub pull Claude greps.
   The dial set is not orphaned, the config was correct, and the whole item rested on an error. See
@@ -2282,6 +2321,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-66 (S121, Emmett, 2026-10-10) — THE OFFSEASON CAMP.** Everything grows, at different speeds: skills a lot,
+  strength and weight can jump, athleticism slowly and never slips, height in small scattered spurts. IQ and Discipline
+  grow by age and minutes and stay near where a man arrived (*"No player is going to go from the 10th to 90th percentile
+  in IQ … in 4 years"*). **Potential is a tier per attribute — a rate, not a ceiling** (*"I don't have to worry about
+  caps, since it isn't a pro sim"*). Camp is **50 points**; an unfunded attribute may slip; the computer **chases the
+  highest potential**, widening and rotating over a career (*"a mix of two and three"*). Camp quality is weighted odds;
+  playing time improves the odds, not the points; a hidden **work ethic** tilts them but *"shouldn't be a cheat code."*
+  Work ethic and potential are fixed at arrival. **Busts tilt to athletic or size bigs who never develop skills and to
+  guards who arrive solid and flatten out.** Better recruits have more potential, *"but not incredibly so."* Potential
+  lives in a **separate scouting file** that holds only current players (ruling B). **Weight stays trainable.** The
+  numbers are first drafts: *"we can go back and tweak the numbers."* Do not "fix" a raw seven-footer whose finishing
+  stalls because the camp chased his rim protection — that is the computer chasing potential.
 - **C-65 (S120, Emmett, 2026-10-09) — THE FREE-THROW LANE.** Six on the lane — four defense, two offense — the shooter
   at the line, one defender and two offense back. Lane spots by size and rebounding (*"the 5'8" point guard who can't
   rebound at all is very rarely going to be on that lane, if ever"*). Foul trouble keeps a man off: two fouls in the first
@@ -2634,6 +2685,13 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE OFFSEASON CAMP — S121 (2026-10-10). NEXT: S122, WEEKLY IN-SEASON PRACTICE (O-126)**, by Emmett's plan at the
+S121 design conversation; drafted at the next-prompt pass (CONVENTIONS §6). **O-120** and **O-121** sit beside it.
+**Carry into any draft that changes what a returner's card is between seasons:** search the suite for checks that
+compare a man's ratings across seasons (Phase 105 C3a was one) and for checks that build season two without the shared
+step (Phase 104 did). **Carry into any control on something that remembers summers:** a streak first reaches two at the
+third camp, so the control needs a career four seasons deep (S121's first control was blind).
 
 ★ **THE FREE-THROW LANE — S120 (2026-10-10). NEXT: NOT YET CHOSEN.** O-118 shipped. The arc's step 4 (development,
 recruiting, prestige movement, transfers) is where the plan goes next; **O-120** (seat every buy game in tight years) and

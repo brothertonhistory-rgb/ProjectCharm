@@ -100,6 +100,11 @@ internal static partial class Program
         //   claimed by exactly one contract. An unregistered dial fails the phase, which
         //   is precisely what makes hardcoding this table safe.
         new("HomeCourt",          typeof(HomeCourtConfig),          LoaderShape.Sectioned),
+        // ★ S121 — the offseason camp's dials. Parity-checked like every section; its lists,
+        //   its splits and its GroupFactor object are legal containers (the arm still checks
+        //   every key name in both directions).
+        new("Development",        typeof(DevelopmentConfig),        LoaderShape.Sectioned,
+            ContainersLegal: true),
         // EXCLUDED. RosterConfig itself declares only Home/Away — against it the section
         // is a clean 2 = 2. But the section's real content is ARRAYS OF PLAYER OBJECTS
         // (the forty rating properties live on the separate PlayerConfig class), and

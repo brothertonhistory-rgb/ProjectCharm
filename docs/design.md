@@ -9030,7 +9030,13 @@ player; `GenMapToPlayer` drops all five fields before the season sees them. Emme
 out of the archive: *"No, 10 years down the line, it doesn't matter. It should maintain a
 historical record."* A ceiling is a scouting opinion about a future that did not occur.
 **Arrival goes with it** — it is a fraction *of* the ceiling and is uninterpretable stored
-alone. The engine gap is separate and real: see O-73. Class year was O-72 — closed at S115: it is in the roster entry (schema 2) and is what the next season advances.
+alone. Class year was O-72 — closed at S115: it is in the roster entry (schema 2) and is what the next season advances.
+
+**Potential is not here either, and that is ruled (S121, ruling B).** The development layer does not read the
+generator's ceiling at all — its runway points the wrong way for this design (big in a man's best skill, near zero in
+the rest) — and rolls its own potential on arrival. That potential, the work ethic and the hidden progress live in a
+**separate scouting file per season** that holds only current players; the season log stays a record of what
+happened. See "Development" at the end of this document.
 
 Two facts worth not re-deriving: the generator's *current* card is fully redundant with the
 stored 38 (the card that becomes those ratings is built from it), and runway is exactly
@@ -12447,8 +12453,8 @@ off (turnovers, rim rate) would be fitting noise. It waits for a calibration ses
 
 ### The two commands
 
-- **`seasons <world> <seed>`** (S114) — legacy only, nothing saved: season one at `<seed>`, the turnover in memory, season two at `<seed>+1` on the result. Season one is the standalone season bit for bit (Phase 104 C8). `--history` is refused by name.
-- **`season <world> <seed> --history <career>`** (S115) — a career season. The first run is the bootstrap (the divvy, as it always was). Every later run: **read last season's people off its log → turn them over → number the freshmen → play → record.** The log the season writes is what the next run starts from. **There is no separate roster file and no end-of-season snapshot** (Emmett's ruling 3, 2026-10-05): the chain of season logs is the save.
+- **`seasons <world> <seed>`** (S114) — legacy only, nothing saved: season one at `<seed>`, the turnover in memory, **then the camp (S121)**, season two at `<seed>+1` on the result. Season one is the standalone season bit for bit (Phase 104 C8). `--history` is refused by name. The turnover and the camp are one function (`StackedTurnoverAndCamp`) that Phase 104 calls too, so no path can play season two on undeveloped men.
+- **`season <world> <seed> --history <career>`** (S115) — a career season. The first run is the bootstrap (the divvy, as it always was; S121 rolls every man's potential). Every later run: **read last season's people off its log and their hidden state off its scouting file → turn them over → number the freshmen → camp the returners and roll the freshmen → play → record.** The log the season writes, and the scouting file beside it, are what the next run starts from. **There is no separate roster file and no end-of-season snapshot** (Emmett's ruling 3, 2026-10-05): the chain of season logs is the save of what happened; the chain of scouting files (S121, ruling B) holds only what the staff knows and the player does not show.
 
 ### The turnover (S114 — a pure function of world, last season's rosters, and this season's seed)
 
@@ -12472,7 +12478,7 @@ The archive format deliberately knows nothing about this league (GameLogReader's
 
 ### Everything refuses before a number is spent
 
-The read of last season's people and every refusal above run at **step 1 of the S97 pipeline** (the peek), so a career that stops here has burned no season id, no game id and no person id (Phase 105 C6a asserts the three counters unmoved). The S115 contract: **the retained log is mandatory on a career.** A history-bound season that kept no log is refused by name — it would be a year the career cannot continue from. The `season` command has passed the log flag unconditionally since S90; the only callers that bind a history without a log are suite checks about schedules, events, contracts and memory, which say so with `bootstrapPeopleForTest` (fresh people this season, as every season did before S115). The command never sets it. The S114 refusal of rosters-in-hand-on-a-career is retired; the S89 identity contract guards that pair.
+The read of last season's people, **the Development dials and last season's scouting file (S121)**, and every refusal above run at **step 1 of the S97 pipeline** (the peek), so a career that stops here has burned no season id, no game id and no person id (Phase 105 C6a asserts the three counters unmoved). The S115 contract: **the retained log is mandatory on a career.** A history-bound season that kept no log is refused by name — it would be a year the career cannot continue from. The `season` command has passed the log flag unconditionally since S90; the only callers that bind a history without a log are suite checks about schedules, events, contracts and memory, which say so with `bootstrapPeopleForTest` (fresh people this season, as every season did before S115). The command never sets it. The S114 refusal of rosters-in-hand-on-a-career is retired; the S89 identity contract guards that pair.
 
 ### The page
 
@@ -12585,3 +12591,110 @@ unreadable-then-missing season; the bottom line equal to the player page's row c
 against its game, no Uncredited line on any stock side (S118: a wall at zero), a game whose men exceed the final refused; every high
 recomputed independently for every man of a three-season career, a listed reference opening the box score that holds
 it, the star and its control; the legacy season unmoved.
+
+## Development — hidden potential, work ethic and the offseason camp (Session 121, 2026-10-10)
+
+A player is no longer the same player every season. He arrives with a **hidden potential** and a **hidden work
+ethic**, both fixed for his career, and between seasons every returner goes through an **offseason camp** that makes
+him better — by how much depends on his potential, where the camp spends its time, how the camp goes, how much he
+played, and how hard he works. Weekly in-season practice is S122 (O-126), not this layer. Every number is a dial in
+config.json's `Development` section (Emmett's instruction for the arc: *"The prerogative is to make things editable and
+modifiable"*); the rulings are C-66.
+
+### The groups (K1 — membership is code, the rates are dials)
+
+- **Skills (20)** — the generator's 19 spend skills and `HelpDefense`. Camp-funded; they can grow a lot; unfunded, each
+  slips one point with `AtrophyChance` (0.25).
+- **Body (3)** — `Strength`, `Weight`, `Endurance`. Camp-funded and able to jump (*"get a young guy in the weight room
+  hard core"*); unfunded they can slip. Weight is read by no game code yet; it stays trainable by ruling and its game
+  impact is O-131.
+- **Athleticism (4)** — `Speed`, `Quickness`, `FirstStep`, `Vertical`. A slow natural climb every summer by tier,
+  funded or not, plus a small bonus when funded (`GroupFactor.Athleticism` 0.35); **never slips**.
+- **The IQ rule** — `BasketballIQ` and `Discipline`, each on its own keys: `+1 + 2 × minutes share` a summer (0 minutes
+  +1, 20 mpg +2, 40 mpg +3), never above arrival + 8, never down. Not camp-funded.
+- **Fixed** — `Hustle`. `Height` and `Wingspan` move only by a spurt: 4% of men a summer, +3 rating (about an inch) and
+  +2 wingspan.
+- **Derived** — the five shot-diet tendencies are re-derived from the developed card; `FreeThrow` moves by the change in
+  the generator's own formula (the per-man idiosyncrasy, which is not on the card, cancels), rounded each summer — a man
+  can end a point off what the generator would give his senior shooting, never more than two.
+- **Labels stay (K2)**: position, offensive role, defensive plane and scout rank are his identity for the career; a wing
+  who bulks up stays listed a wing (O-129).
+
+### Potential and work ethic — rolled once, on arrival
+
+The bootstrap pool on a career's first season (and in memory on the `seasons` command); each freshman class after its
+draft. Potential is **rolled fresh**, never read from the generator's runway, which points the wrong way for this
+design.
+
+1. **Cohort descriptors** (never stored, never on a Player, never read by a game; the scout rank stays quarantined to
+   the draft board). Within his position in his arriving cohort: a body z-score (mean of height, strength and the four
+   athletic ratings) and a skill z-score (mean of his five best spend skills); `gap` = body − skill; `talent` = their
+   mean; the top third by talent. Plain left-to-right sums in arrival pool-index order.
+2. **One player-wide tier**: `PlayerTierOdds` (.08 / .28 / .37 / .19 / .08), shifted one notch down for the athletic or
+   size big (chance rising with `gap`), down for the man who arrives finished (rising with skill), up 15% of the time for
+   the top third by talent — net shift at most one. **Rolling each skill on its own makes busts impossible** (R2's
+   measurement: nearly every man has some skill high and the camp always finds it), so the skills are drawn **near** the
+   player-wide tier.
+3. **Each skill**: the player-wide tier plus an offset (−2..+2 on `SkillOffsetOdds`), one notch down for a guard in
+   post skills, a big in perimeter skills, and on his best current skill; clamped once.
+4. **Each body and athletic attribute** on its own (`BodyTierOdds`) — the monster athlete and the skill are separate gifts.
+5. **Work ethic** 1–99, median 50, from Beta(3, 3) as an order statistic.
+
+### The camp — every returner, between seasons
+
+1. **Minutes share**: his seconds on the floor last season (the S117 integer rule, overtime counted) over his team's
+   games × 40 minutes, clamped to 1.
+2. **The computer's 50 points** go to the attributes with the most promise (`TierRate[tier] × GroupFactor`), the split
+   **widening** each summer — camp 1 20/15/15, camp 2 15/15/10/10, camp 3 15/10/10/10/5 — and **rotating**: anything
+   funded two summers running ranks at 60% of its promise. Ties go to what he is already better at (K9), then the
+   attribute order. The camp number is the class of the season just played (a sophomore's camp is camp 1). Every
+   points map — the computer's, or a hand-set one later (O-128) — is checked: at most 20 on an attribute, 50 in all.
+3. **The camp roll**: bad / normal / good / breakout (.20 / .50 / .22 / .08, multipliers .45 / 1.0 / 1.45 / 2.1),
+   tilted by work ethic (±0.10) and minutes (±0.06) — normal never moves; at the extremes bad runs .04 to .34. A breakout
+   lifts every funded attribute to at least the high tier's rate (*"the light came on"*).
+4. **Growth**: points × tier rate × group factor × camp multiplier × a ±20% jitter, carried as hidden progress below a
+   whole point (always in [0, 1); thrown away at 99; kept through a slip).
+
+**Randomness (K5)** — per-person SplitMix64 streams, never the person number (S89's wall) and never another man's
+draws. A man's **potential stream** is seeded from the arrival season's seed and his arrival pool index; its first draw
+is his **development seed**, kept with him. Each summer's **camp stream** is seeded from that seed and the coming
+season's seed. Fixed draw counts (the development seed then 31 + 2k − 1 at arrival, 33 a camp) keep every stream aligned whatever the branches.
+Order-free: removing or reordering people moves nobody else's camp. A different season seed gives a different camp —
+*"if you save scummed 10 times you should get 10 slightly different results."*
+
+### Where it runs
+
+Its own step after the turnover (and, on a career, after the freshmen are numbered): row i of the turned-over pool comes
+back as row i developed — the same labels, name and hierarchy rank, a new card and a Player rebuilt through
+`GenMapToPlayer`; freshmen are the same objects. The step validates its own contract by name, so the turnover's
+same-object contracts (`ValidateTurnover`, the identity lookup) run untouched on the undeveloped result.
+**Season one never moves** — nothing here consumes a season-one stream.
+
+### The scouting file (ruling B)
+
+`season-N.scout` beside `season-N.log`: that season's people only, each by his number — the tier of each funded
+attribute, work ethic, arrival IQ and Discipline, the development seed, hidden progress and each attribute's streak.
+Text with a SHA-256, every double as its raw bits. Written whole once (write-then-rename) when the season's people are
+fixed; an existing file is never overwritten. Season N+1 reads season N's log **and** season N's scouting file, found
+by the same arithmetic. Missing, damaged, an older version, another career's, another world's or another season's —
+refused by name at step 1, before a number is spent, and **never re-rolled** (that would hand every player new
+potential). A career saved before S121 has none, and is refused at its next season by the standing C-60 sentence.
+
+### How Phase 112 proves it
+
+Exact parity with `tools/development_oracle.py` — which reads every dial from config.json and takes its random inputs
+injected — on the streams, the roll, the allocation, the odds, whole camps, the refusals, a permuted attribute order and
+nine archetype types run 2,000 careers each; funded athleticism never below unfunded on identical draws; the rulings on
+every stock returner; camp outcomes and potential tiers within 4 SE of each man's own odds, with a control that removes
+the bust rule and is caught; the file's round trip and refusals; the career and the stacked command camping man for man
+from minutes read two ways; a four-season career camping 1, 2, 3 in order with the rotation firing, copies resumed
+from disk identical, and blanked memory on disk caught; season one unmoved.
+
+### Stock numbers (seeds 20260720 → 20260721; page-only)
+
+Camps bad 683 / normal 1,633 / good 750 / breakout 270 over 3,336 returners; 130 spurts. One camp in, the average
+funded attribute moves about +0.5 and a man's best five skills +0.6 to +0.9. Over three camps, flat careers (no skill
+up 8): athletic or size bigs 32.5%, solid-arriving guards 24.0%, everyone else 20.5% — the ordering Emmett ruled. Over a
+three-camp career a man is funded in 5–8 distinct attributes. Shooter with very high potential and poor work ethic:
+Outside 52 → 64 / 72 / 82 (10th / 50th / 90th); a monster athlete's low-potential finishing 40 → 44 / 46 / 59 when
+you fund it, 38 / 39 / 40 when the computer chases his athleticism instead.

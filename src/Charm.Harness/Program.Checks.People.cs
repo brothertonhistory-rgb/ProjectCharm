@@ -164,13 +164,20 @@ internal static partial class Program
                 var seniors1 = r1.Where(e => e.Class == 3).Select(e => e.PersonId).ToHashSet();
                 var returners = r2.Where(e => by1.ContainsKey(e.PersonId)).ToList();
                 var freshmen = r2.Where(e => !by1.ContainsKey(e.PersonId)).ToList();
+                // ★ S121 re-scoped (Emmett's ruling): the SAME MAN — number, school, class + 1, name,
+                //   orientation — with his ratings the CAMP's result. The 38 on the log are exactly the
+                //   developed card the season played, read back by his number.
+                var devIndex = Enumerable.Range(0, stockTwo.Divvy.Pool.Count).ToDictionary(i => stockTwo.Divvy.PersonIds![i]);
+                var campedCards = returners.Count(e => !by1[e.PersonId].Ratings.SequenceEqual(e.Ratings));
                 Check("C3a (stock): every non-senior of season one is in season two under the SAME number, at the same school, one class on, " +
-                      "same name, same 38 ratings, same orientation",
+                      "same name, same orientation — and his 38 ratings are the camp's result, not last season's",
                       returners.Count == r1.Count - seniors1.Count
                       && returners.All(e => by1[e.PersonId].Class + 1 == e.Class && by1[e.PersonId].SchoolId == e.SchoolId
-                                            && by1[e.PersonId].Name == e.Name && by1[e.PersonId].Ratings.SequenceEqual(e.Ratings)
-                                            && by1[e.PersonId].OffensiveRole == e.OffensiveRole),
-                      $"{returners.Count} returned");
+                                            && by1[e.PersonId].Name == e.Name && by1[e.PersonId].OffensiveRole == e.OffensiveRole
+                                            && devIndex[e.PersonId] < stockTwo.Development!.ReturnerCount
+                                            && RetentionRatingOrder.Select(k => (short)stockTwo.Divvy.Pool[devIndex[e.PersonId]].Ratings[k]).SequenceEqual(e.Ratings))
+                      && campedCards > returners.Count / 2,
+                      $"{returners.Count} returned; {campedCards} carry a changed card after camp");
                 Check("C3b (stock): every departed senior's number is absent from season two", !r2.Any(e => seniors1.Contains(e.PersonId)),
                       $"{seniors1.Count} departed");
                 Check("C3c (stock): every freshman is a Freshman with a number new to the career, and the high-water moved by exactly the class size",

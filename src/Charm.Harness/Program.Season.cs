@@ -226,6 +226,18 @@ internal static partial class Program
         /// <summary>★ S120 -- per-game free-throw lane audit, index for index with
         /// <see cref="PossessionCounts"/>. A SEPARATE list: no fingerprint can read it. Phase 111 only.</summary>
         public List<GameLaneAudit> LaneAudits { get; init; } = new();
+        /// <summary>★ S121 — each man's seconds on the floor this season, by pool id, summed game by
+        /// game through the S117 integer rule (overtime counted). Captured whether or not a log is
+        /// written, so the stacked command's camp reads the same minutes a career reads off its log
+        /// (Phase 112 C5). No fingerprint reads it.</summary>
+        public Dictionary<int, long> SecondsByPool { get; init; } = new();
+        /// <summary>★ S121 — games each school played this season, every kind. The minutes share's
+        /// denominator.</summary>
+        public Dictionary<int, int> TeamGames { get; init; } = new();
+        /// <summary>★ S121 — what this season's camp did (a career's second season onward), and the hidden
+        /// state of every man this season (a career; null otherwise). Phase 112 reads both.</summary>
+        public DevelopmentStep? Development { get; init; }
+        public DevState[]? DevStates { get; init; }
         /// <summary>★ S95 — how many games actually had a road side transformed. The
         /// counter increments only when the PREPARED away side is the shaved one, so it
         /// counts what played rather than what was intended. Phase 86 B8 reads it from
@@ -1773,6 +1785,19 @@ internal static partial class Program
         CareerPeople? careerPeople = null;
         if (history is not null && rostersInHand is null && !bootstrapPeopleForTest && pendingSeasonId - 1 >= 1)
             careerPeople = ReadCareerPeople(history, world, pendingSeasonId - 1);
+        // ★ S121 — THE CAMP'S INPUTS, read at step 1 on the same terms: the Development dials (an
+        //   edit that breaks an equation refuses here, before a number is spent) and, on a career's
+        //   second season onward, last season's scouting file — found by the same arithmetic as its
+        //   log. A missing or damaged file refuses by name; potential is never re-rolled.
+        DevelopmentConfig? devCfg = null;
+        IReadOnlyList<ScoutingRecord>? previousScouting = null;
+        if (history is not null && retainGameLog)
+        {
+            devCfg = DevelopmentConfig.Load(engineConfigPath);
+            if (careerPeople is not null)
+                previousScouting = ScoutingFile.Read(history.Path, new ScoutingBindings(
+                    history.HistoryId, history.WorldFingerprint, careerPeople.PreviousSeasonId));
+        }
         var eventHistory = MteReadHistory(history, pendingSeasonId);
         // ★ S103 — last season's promises, read from EXACTLY season N-1's record.
         var contractLoad = ReadLiveContracts(history, pendingSeasonId);
@@ -1885,6 +1910,26 @@ internal static partial class Program
             divvy = RunDivvyDraft(world, seasonSeed, history);
             if (history is not null) people = PeopleSummary.Bootstrap;
         }
+        // ★ S121 — THE CAMP, its own step after the people are numbered (G4): the returners camp,
+        //   the freshmen are rolled; on a career's first season the whole bootstrap pool is rolled.
+        //   Only a career keeps this state (in its scouting file); the stacked command develops in
+        //   memory through StackedTurnoverAndCamp.
+        DevelopmentStep? development = null;
+        DevState[]? devStates = null;
+        if (devCfg is not null)
+        {
+            if (careerPeople is not null)
+            {
+                development = CareerDevelop(divvy, people!.Returned, careerPeople, previousScouting!, seasonSeed, devCfg);
+                divvy = development.Divvy;
+                devStates = development.States;
+            }
+            else if (rostersInHand is null)
+            {
+                devStates = DevBootstrap(divvy, seasonSeed, devCfg).States;
+            }
+            if (verbose && development is not null) PrintDevelopmentReport(development);
+        }
         if (verbose && people is not null) Console.WriteLine(people.Line);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
@@ -1921,6 +1966,9 @@ internal static partial class Program
         var sidePossessions = new List<SidePossessionCount>(schedule.Count);
         var putbackAudits = new List<GamePutbackAudit>(schedule.Count);   // ★ S118, Phase 108 only
         var laneAudits = new List<GameLaneAudit>(schedule.Count);         // ★ S120, Phase 111 only
+        // ★ S121 — each man's seconds and each school's games, for the next camp's minutes share.
+        var secondsByPool = new Dictionary<int, long>();
+        var teamGames = new Dictionary<int, int>();
         var hostedRoadSidesShaved = 0;
         var leagueRoadSidesShaved = 0;
         var ties = 0;
@@ -1943,6 +1991,10 @@ internal static partial class Program
         if (retainGameLog && history is not null)
         {
             var roster = BuildRetentionRoster(rowsBySchool, divvy);
+            // ★ S121 — this season's people's hidden state, written whole once, beside the log.
+            if (devStates is not null)
+                ScoutingFile.Write(history.Path, history.HistoryId, history.WorldFingerprint,
+                                   schedule[0].SeasonId!.Value, DevScoutingRecords(divvy, devStates));
             gameLog = GameLogWriter.Create(
                 history.Path, history.HistoryId, history.WorldFingerprint, fingerprint,
                 schedule[0].SeasonId!.Value, roster);
@@ -1993,6 +2045,12 @@ internal static partial class Program
                 rowsBySchool[sg.HomeId], rowsBySchool[sg.AwayId], sideHome, sideAway);
             // Snapshot BEFORE the first accumulator. The three calls below write different
             // halves of a man's line, so the boundary has to enclose all of them.
+            // ★ S121 — the credits each of this game's men held before it, so the game's own
+            //   credits (and through the S117 rule, his seconds) can be read after.
+            var creditsBefore = new Dictionary<int, long>(2 * RosterShape.Size);
+            foreach (var rows in new[] { identity.HomeRows, identity.AwayRows })
+                foreach (var row in rows)
+                    creditsBefore[row.PoolId] = league.PlayerSeasons.TryGetValue(row.PoolId, out var rec0) ? rec0.Credits : 0;
             var retentionBefore = gameLog is null ? null
                                 : RetentionSnapshotBefore(league, identity);
 
@@ -2026,6 +2084,16 @@ internal static partial class Program
                     storedPos[sd.Reserves[k].PlayerId] = sd.ReservePositions[k];
             }
             league.NoteOccupancy(result.Possessions, game, storedPos, seatPos, seatH, identity);
+
+            // ★ S121 — his seconds this game, by the same integer rule a career reads off its log.
+            foreach (var (poolId, before) in creditsBefore)
+            {
+                var after = league.PlayerSeasons.TryGetValue(poolId, out var rec1) ? rec1.Credits : 0;
+                var secs = after == before ? 0 : DevGameSeconds(after - before, result.Possessions.Count, result.OvertimePeriods);
+                secondsByPool[poolId] = (secondsByPool.TryGetValue(poolId, out var sofar) ? sofar : 0) + secs;
+            }
+            teamGames[sg.HomeId] = (teamGames.TryGetValue(sg.HomeId, out var hg) ? hg : 0) + 1;
+            teamGames[sg.AwayId] = (teamGames.TryGetValue(sg.AwayId, out var ag) ? ag : 0) + 1;
 
             // ...and diff AFTER the last one. Emission is the games-played delta, never a
             // credits delta read after the fact.
@@ -2227,6 +2295,10 @@ internal static partial class Program
             SidePossessions = sidePossessions,
             PutbackAudits = putbackAudits,
             LaneAudits = laneAudits,
+            SecondsByPool = secondsByPool,
+            Development = development,
+            DevStates = devStates,
+            TeamGames = teamGames,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,
@@ -2888,14 +2960,18 @@ internal static partial class Program
             Console.WriteLine();
 
             // ★ Freshmen are generated only after season one has finished (A1).
-            var turnover = RunTurnover(world, one.Divvy, seedTwo);
+            // ★ S121 — the turnover, then the camp: ONE function, shared with Phase 104, so season two
+            //   can never play on undeveloped men. Season one's minutes come from its own run.
+            var stacked = StackedTurnoverAndCamp(world, one, seed, seedTwo, DevelopmentConfig.Load(engineConfigPath));
+            var turnover = stacked.Turnover;
             PrintTurnoverReport(world, one.Divvy, turnover);
+            PrintDevelopmentReport(stacked.Development);
 
             var scheduleTwo = BuildSeasonSchedule(world, seedTwo);
             Console.WriteLine("=== SEASON TWO (on the turned-over rosters; prestige frozen; a fresh schedule draw — " +
                               "host memory reads a career and there is none) ===");
             PrintSeasonBanner(world, args[1], seedTwo, scheduleTwo.Count, rostersInHand: true);
-            var two = RunSeasonCore(world, seedTwo, engineConfigPath, verbose: true, rostersInHand: turnover.SeasonTwo,
+            var two = RunSeasonCore(world, seedTwo, engineConfigPath, verbose: true, rostersInHand: stacked.SeasonTwo,
                                     seasonYear: yearOne + 1);
             PrintSeasonPage(two, world, history: null, minuteFloor);
         }

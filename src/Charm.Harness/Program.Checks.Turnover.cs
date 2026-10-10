@@ -77,9 +77,14 @@ internal static partial class Program
 
             var one = RunSeasonCore(stock, TurnoverCheckSeed, configPath, verbose: false);
             var pool1 = one.Divvy.Pool;
-            var t = RunTurnover(stock, one.Divvy, seedTwo);
+            // ★ S121 — the turnover, then the camp, through the ONE step the `seasons` command uses, so
+            //   season two here plays the men the command would play. `t` is the turnover itself (the
+            //   undeveloped result, where the turnover's own contracts hold); C1–C7 read it as before.
+            var devCfg = DevelopmentConfig.Load(configPath);
+            var stacked = StackedTurnoverAndCamp(stock, one, TurnoverCheckSeed, seedTwo, devCfg);
+            var t = stacked.Turnover;
             var pool2 = t.SeasonTwo.Pool;
-            var two = RunSeasonCore(stock, seedTwo, configPath, verbose: false, rostersInHand: t.SeasonTwo);
+            var two = RunSeasonCore(stock, seedTwo, configPath, verbose: false, rostersInHand: stacked.SeasonTwo);
 
             // ── C1: every senior left and nobody else did ───────────────────────
             {
@@ -302,7 +307,8 @@ internal static partial class Program
                 Check("C7a: the same two seeds give identical season-two rosters and pool rows",
                       again.SeasonTwo.Rosters.All(kv => kv.Value.SequenceEqual(t.SeasonTwo.Rosters[kv.Key]))
                       && again.SeasonTwo.Pool.Zip(pool2).All(x => SameRow(x.First, x.Second)));
-                var twoAgain = RunSeasonCore(stock, seedTwo, configPath, verbose: false, rostersInHand: again.SeasonTwo);
+                var twoAgain = RunSeasonCore(stock, seedTwo, configPath, verbose: false,
+                                             rostersInHand: StackedTurnoverAndCamp(stock, one, TurnoverCheckSeed, seedTwo, devCfg).SeasonTwo);
                 Check("C7b: season two replayed gives an identical page digest (games, scores, possessions, seven fingerprints)",
                       PageDigest(twoAgain) == PageDigest(two), PageDigest(two)[..16]);
                 var other = RunTurnover(stock, one.Divvy, seedTwo + 1);
@@ -354,7 +360,17 @@ internal static partial class Program
                     if (r.Ranked.Count + r.Excluded.Count != n) throw new InvalidOperationException("rating did not cover the league");
                 });
                 Check("C9c: the S112 record built and the rating computed without refusal", rex is null, Blame(rex));
-                Check("C9d: season two's rosters are the turned-over rosters (same objects)", ReferenceEquals(two.Divvy, t.SeasonTwo));
+                // ★ S121 re-scoped: season two plays the DEVELOPED pool — the turnover's rosters (same
+                //   objects) with every returner the same man after camp, index for index.
+                Check("C9d: season two plays the turned-over rosters after camp — the developed pool, the turnover's own rosters object, " +
+                      "every returner the same man (name, position, role, class) and every freshman the same object",
+                      ReferenceEquals(two.Divvy, stacked.SeasonTwo) && ReferenceEquals(stacked.SeasonTwo.Rosters, t.SeasonTwo.Rosters)
+                      && Enumerable.Range(0, pool2.Count).All(i =>
+                          i < t.ReturnerCount
+                              ? stacked.SeasonTwo.Pool[i].Player.Name == pool2[i].Player.Name && stacked.SeasonTwo.Pool[i].Pos == pool2[i].Pos
+                                && stacked.SeasonTwo.Pool[i].Role == pool2[i].Role && stacked.SeasonTwo.Pool[i].Class == pool2[i].Class
+                              : ReferenceEquals(stacked.SeasonTwo.Pool[i], pool2[i])),
+                      $"{t.ReturnerCount} returners camped");
             }
 
             // ── C10: the runner without rosters in hand is unchanged ────────────

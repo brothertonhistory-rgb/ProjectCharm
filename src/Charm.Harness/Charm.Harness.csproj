@@ -250,6 +250,12 @@
     <None Include="..\..\tools\ft_lane_golden.json" Link="tools\ft_lane_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S121 offseason-camp golden (emitted by tools/development_oracle.py, which reads the
+         Development section of config.json). Phase 112 C1 replays it. THE RECURRING MISSED FILE:
+         without this line Phase 112 fails as a file-not-found. -->
+    <None Include="..\..\tools\development_golden.json" Link="tools\development_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- S88's two fixtures. S88 wrote them, and wrote the checks that read them, but never
          added them here — so Phase 79 could not have passed even if it had been registered.
          Added at S89.1 alongside registering the phase itself. -->

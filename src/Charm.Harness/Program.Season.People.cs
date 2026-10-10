@@ -44,7 +44,11 @@ internal static partial class Program
 {
     /// <summary>Last season's people, as read off its log: a <see cref="DivvyResult"/> the
     /// turnover can take exactly as it takes the in-memory one, plus which season it came from.</summary>
-    private sealed record CareerPeople(DivvyResult Previous, long PreviousSeasonId);
+    /// <para>★ S121 — also each man's seconds on the floor last season (by his number) and each
+    /// school's games, read off the same log: the next camp's minutes share.</para>
+    private sealed record CareerPeople(DivvyResult Previous, long PreviousSeasonId,
+                                       IReadOnlyDictionary<PersonId, long> Seconds,
+                                       IReadOnlyDictionary<int, int> TeamGames);
 
     /// <summary>The one page line a career season prints about its people.</summary>
     private sealed record PeopleSummary(long? FromSeason, int Returned, int Arrived, int Departed)
@@ -80,7 +84,17 @@ internal static partial class Program
         // it is let through untouched.
         var log = GameLogReader.ReadFinalized(path, bindings);
         var roster = log.RosterV2();
-        return new CareerPeople(PoolRowsFromRoster(roster, world), prev);
+        // ★ S121 — minutes, by the S117 integer rule, game by game (overtime counted).
+        var seconds = new Dictionary<PersonId, long>();
+        var teamGames = new Dictionary<int, int>();
+        foreach (var block in log.Blocks)
+        {
+            teamGames[block.Facts.HomeSchoolId] = (teamGames.TryGetValue(block.Facts.HomeSchoolId, out var h) ? h : 0) + 1;
+            teamGames[block.Facts.AwaySchoolId] = (teamGames.TryGetValue(block.Facts.AwaySchoolId, out var a) ? a : 0) + 1;
+            foreach (var r in block.Rows)
+                seconds[r.PersonId] = (seconds.TryGetValue(r.PersonId, out var sofar) ? sofar : 0) + CareerGameSeconds(r, block.Facts);
+        }
+        return new CareerPeople(PoolRowsFromRoster(roster, world), prev, seconds, teamGames);
     }
 
     // ── The read-back ────────────────────────────────────────────────────────────
@@ -237,5 +251,59 @@ internal static partial class Program
         var summary = new PeopleSummary(people.PreviousSeasonId, t.ReturnerCount, t.Freshmen.Count,
                                         prev.Pool.Count - t.ReturnerCount);
         return (divvy, summary);
+    }
+
+    // ── ★ S121 — the career's camp ───────────────────────────────────────────────
+
+    /// <summary>The camp on a career, run after <see cref="CareerTurnover"/> has numbered the people:
+    /// each returner's hidden state comes off last season's scouting file by his number, his minutes
+    /// off last season's log; the freshmen are rolled. Development is index for index (G4).</summary>
+    private static DevelopmentStep CareerDevelop(
+        DivvyResult turnedOver, int returnerCount, CareerPeople people,
+        IReadOnlyList<ScoutingRecord> previousScouting, long seasonSeed, DevelopmentConfig cfg)
+    {
+        var byPerson = previousScouting.ToDictionary(r => r.Person);
+        var schoolOf = DevSchoolOf(turnedOver);
+        var states = new DevState[returnerCount];
+        var shares = new double[returnerCount];
+        for (var i = 0; i < returnerCount; i++)
+        {
+            var id = turnedOver.PersonIds![i];
+            if (!byPerson.TryGetValue(id, out var rec))
+                throw new InvalidOperationException(
+                    $"S121 career: returner #{i} ({id}) is not in season {people.PreviousSeasonId}'s scouting file; " +
+                    "his potential is unknown and is never re-rolled.");
+            states[i] = DevStateFromRecord(rec);
+            people.Seconds.TryGetValue(id, out var secs);
+            people.TeamGames.TryGetValue(schoolOf[i], out var games);
+            shares[i] = DevMinutesShare(secs, games);
+        }
+        return DevelopSeason(turnedOver, returnerCount, states, shares, seasonSeed, cfg);
+    }
+
+    private static DevState DevStateFromRecord(ScoutingRecord r)
+    {
+        if (r.Tiers.Count != DevFundedCount || r.Streaks.Count != DevFundedCount || r.Progress.Count != DevProgressCount)
+            throw new InvalidOperationException(
+                $"S121 career: {r.Person}'s scouting record holds {r.Tiers.Count}/{r.Streaks.Count}/{r.Progress.Count} entries; " +
+                $"this build develops {DevFundedCount} attributes and {DevProgressCount} progress slots.");
+        return new DevState
+        {
+            DevSeed = r.DevSeed, WorkEthic = r.WorkEthic, ArrivalIq = r.ArrivalIq, ArrivalDiscipline = r.ArrivalDiscipline,
+            Tiers = r.Tiers.ToArray(), Streaks = r.Streaks.ToArray(), Progress = r.Progress.ToArray(),
+        };
+    }
+
+    private static ScoutingRecord DevRecordOf(PersonId person, DevState st)
+        => new(person, st.DevSeed, st.WorkEthic, st.ArrivalIq, st.ArrivalDiscipline,
+               (int[])st.Tiers.Clone(), (int[])st.Streaks.Clone(), (double[])st.Progress.Clone());
+
+    /// <summary>This season's people, as the scouting file holds them: one record per man, by number.</summary>
+    private static List<ScoutingRecord> DevScoutingRecords(DivvyResult divvy, IReadOnlyList<DevState> states)
+    {
+        if (divvy.PersonIds is null || states.Count != divvy.Pool.Count)
+            throw new InvalidOperationException(
+                $"S121: {states.Count} development states for {divvy.Pool.Count} people (identity map {(divvy.PersonIds is null ? "absent" : "present")}).");
+        return Enumerable.Range(0, divvy.Pool.Count).Select(i => DevRecordOf(divvy.PersonIds[i], states[i])).ToList();
     }
 }
