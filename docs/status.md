@@ -10,7 +10,16 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 122** (2026-10-11; verified on Emmett's machine — the full suite, **98 timed sections,
+Last updated: **Session 123** (2026-10-12; verified on Emmett's machine — the full suite, **99 timed sections,
+1,248.5s, `ALL CHECKS PASSED.`**; Phase 114 new, 33 assertions, every predicted marker landed; the suite time missed —
+Phase 90, O-114). **THE SEASON THAT CAN STOP** (save design phase A, ★ **C-68**, Emmett 2026-10-11 — Q1: *"I'd hate
+to save my file on March 1st and have to close the program"*): a season is now set up, played through any day — a
+day, a week, any stretch — and closed on command. **Nothing moved**: chunked equals one call on every game, count,
+fingerprint and file, the season page line for line; every file is byte for byte at every stage — after the set-up
+the S122 build's own pre-play files, untouched by every advance. Every piece of the season's live state is listed by
+name, type and category, and a field added without a place on the list fails the suite. Journal S123 has the detail.)
+
+Previous: **Session 122** (2026-10-11; verified on Emmett's machine — the full suite, **98 timed sections,
 820.5s, `ALL CHECKS PASSED.`**; Phase 113 new, 38 assertions, every predicted number landed). **THE SEASON ON THE
 CALENDAR** (★ **C-67**, Emmett 2026-10-10: *"a calendar needs to be the background organization that runs the whole
 game"*): every game is played on its day, one day at a time from November 1 to the championship Monday, each day's
@@ -608,6 +617,10 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S123 MOVED NO GAME AND NO FILE.** Every fingerprint and pin stays where S122 left it (Phases 102–104, 113 green);
+Phase 114 re-proves the S121 pins and the S120 capture on a career played in random chunks. The season page is S122's
+line for line. `RunSeasonCore` is now a wrapper over `SeasonBegin` / `AdvanceThrough` / `Finish`.
+
 **S122 MOVED NO GAME.** Every fingerprint and pinned result stays at the S120 capture (Phases 102–104, Phase 113 C6b);
 season one's game blocks, its event record and a two-season career file are pinned from the S121 build (Phase 113 C2);
 every season two is unmoved too (C2d: calendar against old order, byte for byte). What changed is the order games are
@@ -799,6 +812,14 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S123 — THE SEASON THAT CAN STOP (save design phase A, C-68).** `Program.Season.Run.cs` (new): `SeasonRunOptions`,
+  `SeasonBegin`, `SeasonRun` — the set-up, the game (`PlayOneGame`) and the close moved verbatim, every value they read
+  a field. `Program.Season.Calendar.cs`: `SeasonCalendarRun` — `NextDay` / `AdvanceThrough` / `IsComplete` / `Finish` /
+  `Dispose`; refuses by name backwards, past the end, `Finish` early or twice, an advance after `Finish`, a partial
+  advance in fixture order; a failure while playing or closing faults the run and every later call is refused naming the
+  day. `RunSeasonCore` and `SeasonPlayCalendar` are one-call wrappers with their old signatures. `SeasonStaticSource`'s
+  unused callback removed. Phase 114 new (33) with the state inventory (105 fields, five categories); registry 99.
+  Journal S123.
 - **★ S122 — THE SEASON ON THE CALENDAR (C-67).** `Program.Season.Calendar.cs` (new): `SeasonPlayCalendar`, the day
   loop from `FirstLegalDay` to `LastLegalDay` (empty days included), each day's games in ordinal order, refusing by name
   a duplicate or missing ordinal, an undated game, a game outside the season, a later round on or before its feeder's
@@ -1421,14 +1442,21 @@ chart is PROVISIONAL pending O-6.
   spring signing; June–July freshmen arrive and the summer camp; July 1 the new basketball year; October preseason
   practice. Today the turnover and the camp run as one step at the top of the next season. **Next, by Emmett's order of
   work**, together with O-134.
-- **O-134 — SAVE ANYWHERE, RELOAD ANYWHERE, AND THE SIM BUTTONS (S122, C-67).** *"'sim day', 'sim week', 'sim month',
-  'sim to next game/event'"*; *"close and save the game at any point of the season/offseason and … reload the save game
-  where they left off."* The save redesign — **includes the log written in play order**, as each game plays (S122 holds
-  blocks and appends them in ordinal order after the season, K2), and a season that can stop and resume mid-calendar.
+- **O-134 — SAVE ANYWHERE, RELOAD ANYWHERE, AND THE SIM BUTTONS (S122, C-67; re-scoped S123 to C-68's five phases).**
+  *"'sim day', 'sim week', 'sim month', 'sim to next game/event'"*; *"close and save the game at any point of the
+  season/offseason and … reload the save game where they left off."* **A** — the season that can stop ✅ S123. **B1** —
+  safe saves: **next**, once its ledger (brief §14a) is re-verified against the S123 build. **B2** — resuming
+  mid-season: under Q1 a **snapshot** design (its schema, shared references restored, live source state, resources
+  rebound), with re-play kept as the suite's oracle — a snapshot restored in a fresh process must finish identical to an
+  uninterrupted season; the brief's re-play design of B2 is no longer authoritative. The log **written as games play**
+  (Q5, ruled) is an **uncommitted working file until the season closes** — a file the current save lists is never
+  appended to — settled before B1 finalizes its transaction design. **B3** — fresh dice (O-132), autosave (Q2: day,
+  week, two weeks or month; weekly by default), the sim commands. **C** — prestige read from the league state.
 - **O-132 — FRESH DICE ON EVERY LIVE SIM; FIXED SEEDS FOR THE SUITE (S122).** *"If i sim a game 10,000 times i should
   get 10,000 unique results right?"* — yes; and the camp ruling, *"if you save scummed 10 times you should get 10
   slightly different results."* Today every game's seeds come from its season seed and fixture ordinal. The live game
-  draws fresh; the suite keeps fixed seeds. Belongs to the save session (O-134).
+  draws fresh; the suite keeps fixed seeds. **In B3 (O-134), ruled Q4 (C-68):** a game already played never changes;
+  the days after a save re-roll on every load; the suite keeps fixed dice.
 - **O-135 — RECRUITING THROUGH THE YEAR (S122, C-67).** Recruiting happens during many of the year's phases (Emmett, on
   the approved year). After O-133, O-134 and O-126.
 - **O-126 — WEEKLY IN-SEASON PRACTICE (S121; re-sequenced at S122).** Small weekly bumps during the season, on top of the
@@ -1512,7 +1540,9 @@ chart is PROVISIONAL pending O-6.
   guards. Phase 104 prints the movement; O-6's rank modernization is the natural home.
 - **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114; fourth at S115: suite 739.8s against S114's 1,957.8s on
   one more check, and the sandbox 938.9s — the spread now runs both ways; fifth at S116: Phase 105 168.2s and 138.7s on
-  two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite).** Phase 103 ran **93.5s** on Emmett's machine against
+  two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite;
+  sixth at S123: Phase 90 110.8s against 36.3s at S122, the rest ~7% slower, suite 1,248.5s — split in the sandbox on
+  both builds, Phase 90 77.0s on S122 and 68.9s on S123, so not the code).** Phase 103 ran **93.5s** on Emmett's machine against
   17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
   of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
   wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
@@ -2364,6 +2394,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-68 (S123, Emmett, 2026-10-11) — THE SAVE DESIGN.** Five phases: A, the season that can stop (S123 ✅); B1, safe
+  saves; B2, resuming mid-season; B3, fresh dice, autosave and the sim commands; C, prestige read from the league state.
+  **Q1 store everything** — a mid-season save holds the season's whole live state, so loading is fast; re-play only in
+  the suite, to prove a loaded save finishes as an uninterrupted season does (*"When we get a full suite of D1, D2, D3,
+  JUCO, Etc... that's a lot of stuff to replay. I'd hate to save my file on March 1st and have to close the program"*).
+  **Q2** autosave is a setting — every day, week, two weeks or month; weekly by default. **Q3** careers from before the
+  save format are refused with the C-60 sentence. **Q4** games already played never change; the days after a save
+  re-roll on every load; the suite keeps fixed dice. **Q5** the season log is written as games are played. **Q6** a
+  damaged or missing finished-season file is refused by name, "for now". **Q7** settings and code may change between
+  seasons; each season records its rules. **Q8** strict — a different build refuses a mid-season save and offers to
+  restart that season. Do not "fix" the state inventory into a save-completeness proof: it is a top-level list by design;
+  completeness is B2's (a snapshot restored in a fresh process).
 - **C-67 (S122, Emmett, 2026-10-10) — THE CALENDAR RUNS THE GAME.** *"The game needs to be in calendar order, and in
   general a calendar needs to be the background organization that runs the whole game. It should be July 8, 1987 or
   whatever and offseason recruiting, or whatever ends up going on then, is happening."* **The year**, approved as
@@ -2741,6 +2783,17 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE SEASON THAT CAN STOP — S123 (2026-10-12). NEXT: B1, SAFE SAVES (O-134, C-68)**, once its ledger (brief §14a) is
+re-verified against the S123 build; drafted at the next-prompt pass (CONVENTIONS §6). **Carry into the draft:** (1) **the
+brief in the tree is r1, not r3.1** — `99ddbd7`'s message says r3.1, but the committed file is titled r1, recommends
+re-play for Q1 and has no §14; the draft starts from r3.1, which must be put in `docs/` first. (2) Q5 against the
+authority rule is settled before B1's transaction design: the live log is an uncommitted working file until close.
+(3) **Anything run on Windows that reads a file a live writer holds must open it allowing writers**, and no check
+writes to a live file — the S123 gate found both in the prompt, sandbox-green and Windows-red. (4) **A file carrying
+raw decimal bits is never pinned from a sandbox capture**: S123's probe hash of the unfinished log did not hold on
+Windows (`unfinished log differs`), exactly as CONVENTIONS §2 predicts. (5) A field added to the season run, the walk or
+a game source must be added to Phase 114's inventory with a category; from B2, with a place in the save.
 
 ★ **THE SEASON ON THE CALENDAR — S122 (2026-10-11). NEXT: THE CALENDAR RUNS THE YEAR (O-133), WITH SAVE ANYWHERE,
 RELOAD ANYWHERE AND THE SIM BUTTONS (O-134; fresh dice, O-132)**, by Emmett's order of work (C-67); drafted at the

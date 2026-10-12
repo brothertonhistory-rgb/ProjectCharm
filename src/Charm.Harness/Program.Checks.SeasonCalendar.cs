@@ -95,6 +95,22 @@ internal static partial class Program
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
     }
 
+    /// <summary>Two finished career folders, every file byte for byte: null when they match, else the
+    /// first difference by name. ★ S123 — lifted from Phase 113 so Phase 114 uses the same copy. Read
+    /// with the ordinary file read, so only for folders no live writer holds.</summary>
+    private static string? CalendarFilesDiffer(string dirA, string dirB)
+    {
+        var a = Directory.GetFiles(dirA, "*", SearchOption.AllDirectories)
+                         .Select(f => Path.GetRelativePath(dirA, f)).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        var b = Directory.GetFiles(dirB, "*", SearchOption.AllDirectories)
+                         .Select(f => Path.GetRelativePath(dirB, f)).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        if (!a.SequenceEqual(b)) return $"file lists differ: [{string.Join(", ", a)}] vs [{string.Join(", ", b)}]";
+        foreach (var rel in a)
+            if (!File.ReadAllBytes(Path.Combine(dirA, rel)).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(dirB, rel))))
+                return $"{rel} differs";
+        return null;
+    }
+
     /// <summary>C1's predicate, on any order: every game once, dates never backwards (ties by
     /// ordinal), inside the span, no school twice on a day. Null when it holds; otherwise the
     /// first thing that does not.</summary>
@@ -161,18 +177,6 @@ internal static partial class Program
             return (code, sw.ToString());
         }
         static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-        static string? FilesDiffer(string dirA, string dirB)
-        {
-            var a = Directory.GetFiles(dirA, "*", SearchOption.AllDirectories)
-                             .Select(f => Path.GetRelativePath(dirA, f)).OrderBy(x => x, StringComparer.Ordinal).ToList();
-            var b = Directory.GetFiles(dirB, "*", SearchOption.AllDirectories)
-                             .Select(f => Path.GetRelativePath(dirB, f)).OrderBy(x => x, StringComparer.Ordinal).ToList();
-            if (!a.SequenceEqual(b)) return $"file lists differ: [{string.Join(", ", a)}] vs [{string.Join(", ", b)}]";
-            foreach (var rel in a)
-                if (!File.ReadAllBytes(Path.Combine(dirA, rel)).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(dirB, rel))))
-                    return $"{rel} differs";
-            return null;
-        }
 
         var scratch = Path.Combine(Path.GetTempPath(), "charm-s122-" + Guid.NewGuid().ToString("N"));
         try
@@ -256,7 +260,7 @@ internal static partial class Program
                 Check("C2c: the career file after two seasons, byte for byte, is the S121 build's — the same person, season " +
                       "and game numbers spent", careerSha == CalendarGoldenCareerFile, careerSha[..16]);
 
-                var diff = FilesDiffer(Path.GetDirectoryName(cal.Path)!, Path.GetDirectoryName(old.Path)!);
+                var diff = CalendarFilesDiffer(Path.GetDirectoryName(cal.Path)!, Path.GetDirectoryName(old.Path)!);
                 Check("C2d: ★ ON THIS MACHINE — the same two-season career played on the calendar and in the old order " +
                       "writes EVERY file byte for byte: both season logs (roster sections included), both scouting files, " +
                       "both event records, the career file",
@@ -285,7 +289,7 @@ internal static partial class Program
                 var bytes = File.ReadAllBytes(scout);
                 bytes[bytes.Length / 2] ^= 0x01;
                 File.WriteAllBytes(scout, bytes);
-                var flipped = FilesDiffer(Path.GetDirectoryName(cal.Path)!, copy);
+                var flipped = CalendarFilesDiffer(Path.GetDirectoryName(cal.Path)!, copy);
                 Check("C2g: NEGATIVE CONTROL — one flipped byte in season two's scouting file fails the file comparison",
                       flipped is not null && flipped.Contains("season-2.scout", StringComparison.Ordinal), flipped ?? "NO DIFFERENCE");
             }

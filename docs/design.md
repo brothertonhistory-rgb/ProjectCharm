@@ -12708,20 +12708,22 @@ three-camp career a man is funded in 5–8 distinct attributes. Shooter with ver
 Outside 52 → 64 / 72 / 82 (10th / 50th / 90th); a monster athlete's low-potential finishing 40 → 44 / 46 / 59 when
 you fund it, 38 / 39 / 40 when the computer chases his athleticism instead.
 
-## The season on the calendar (Session 122, 2026-10-10)
+## The season on the calendar (Sessions 122–123, 2026-10-10/12)
 
 ★ **C-67 — the calendar runs the game** (Emmett: *"in general a calendar needs to be the background organization
 that runs the whole game. It should be July 8, 1987 or whatever and offseason recruiting, or whatever ends up going
-on then, is happening."*). This session is the first of three: (1) the season played on the calendar, day by day;
+on then, is happening."*). The arc in three steps: (1) the season played on the calendar, day by day (S122);
 (2) the calendar runs the year — offseason events on their dates — with save anywhere, reload anywhere and the sim
-buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135).
+buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135). Step 2's save work runs
+in five phases (★ **C-68**): A, the season that can stop (S123, below); B1, safe saves; B2, resuming mid-season; B3,
+fresh dice, autosave and the sim commands; C, prestige read from the league state.
 
 ### One day at a time
 
-`RunSeasonCore` no longer walks the league slate, then the brackets, the showcases, the conference tournaments and the
-buy games in turn. It builds every game's **source** before November 1 and hands them to one loop,
-`SeasonPlayCalendar` (`Program.Season.Calendar.cs`), which walks every day from the calendar's `FirstLegalDay`
-(November 1) to its `LastLegalDay` (the championship Monday), empty days included, and plays that day's games.
+The season's set-up (`SeasonBegin`, `Program.Season.Run.cs`) builds every game's **source** before November 1 and hands
+them to one loop, `SeasonCalendarRun` (`Program.Season.Calendar.cs`), which walks every day from the calendar's
+`FirstLegalDay` (November 1) to its `LastLegalDay` (the championship Monday), empty days included, and plays that day's
+games — in one call or in any number of stretches (S123, below).
 
 ```
 build every source (ordinal, date, feeders of every game — known now, even a final's)
@@ -12757,8 +12759,9 @@ whose index means anything but the fixture ordinal. `PlayOrder` is new: the ordi
 
 The season log is **unchanged on disk**: each game's block is built when it is played, held, and appended in ordinal
 order after the season. The cost is honest — a season that crashes mid-run leaves no game blocks, rather than a prefix
-nothing could resume anyway (S90). The save session redesigns the log around play order (O-134), so the format breaks
-once, not twice.
+nothing could resume anyway (S90). ★ **Q5 (C-68) rules the log written as games are played**; it lands with the save
+work, and until the season closes that log is an uncommitted working file — a file the current save lists is never
+appended to. The format breaks once, not twice.
 
 The one number allowed to differ: the season page's **floating-point calibration totals** now add up in calendar order
 and may move in their last printed digit. Nothing asserts them.
@@ -12778,8 +12781,62 @@ past its last played one, a season with no record.
 
 The dice. Every game of a suite run rolls the seeds its ordinal gives it, so a season replayed is the same season —
 that is what makes "nothing moved" provable. The live game will roll fresh dice on every sim (Emmett: *"if i sim a
-game 10,000 times i should get 10,000 unique results right?"*), while the suite keeps fixed seeds. That belongs to the
-save session.
+game 10,000 times i should get 10,000 unique results right?"*), while the suite keeps fixed seeds. ★ **Q4 (C-68):** a
+game already played never changes; the days after a save re-roll on every load. Built in B3.
+
+### The season that can stop (S123 — save design, phase A)
+
+A season is an object (`SeasonRun`, `Program.Season.Run.cs`):
+
+```
+run = SeasonBegin(world, seed, configPath, verbose, options)   // the set-up, and every write it makes
+run.AdvanceThrough(2026-12-15)                                 // plays every day not yet played, through that day
+run.AdvanceThrough(2027-01-03)                                 // writes nothing
+run.AdvanceThrough(run.LastLegalDay)
+outcome = run.Finish()                                         // the close, and every write it makes
+```
+
+`RunSeasonCore` is exactly that, in one call, with its old signature, so every caller is unchanged; `SeasonPlayCalendar`
+is the same over `SeasonCalendarRun`. The set-up, the game and the close are the S122 code moved: every value the game
+or the close reads from the set-up is a field named as the local it was. **Nothing about the basketball and nothing on
+disk changed** — not a byte, not the moment of a write.
+
+★ **The contract.** `NextDay` is the first day not yet played. `AdvanceThrough(day)` plays every day from `NextDay`
+through `day`, empty days included; the day already played through is a no-op; earlier is refused (backwards); past
+the last legal day is refused. `Finish` is legal once, and only when the season is complete; an advance after it is
+refused. A chunk always ends between two days, so the walk's state (which games are played, the schools already on the
+floor today, the month being counted) carries across calls and a chunked season walks exactly the games, in exactly
+the order, of one call. The month line still fires on the first game of a new month; a chunk ending mid-month fires
+nothing; the last month's line fires in `Finish`. Fixture order (Phase 113's test order) accepts only the last day: the
+first such call plays every game in ordinal order, a later one is the no-op, anything else is refused.
+
+★ **The lifecycle.** A precondition refusal is raised before anything plays and leaves the run usable. Any exception
+while playing or closing **faults** the run: the original propagates, and every later call is refused naming the day it
+failed on. A faulted run is never retried in memory — nothing proves a half-played day safe to resume. `Dispose`
+releases the season log's file and lock (closing, deleting nothing) and never touches the career store, which belongs
+to the caller. An abandoned or faulted run leaves exactly what a crash left before S123 — the unfinished log with its
+roster, the event record, the scouting file, the numbers spent; repairing that is B1's.
+
+★ **The state inventory (Q1: store everything).** Phase 114's frozen list names every field of the season run, the
+walk and the five game sources — 105 — by name, declared type and one of five categories: mutable simulation data
+(persist and restore exactly), immutable set-up data (persist, or rebuild from verified inputs), derived values
+(recompute only where equivalence is proven), shared references (restore the relationship — `resultSlots` is the
+same list every conference tournament reads, and the walk holds the same source objects as the run), and resources and
+callbacks (the log writer, the play step, the month line — recreate or rebind, never data). A field added or removed
+without the list fails the suite. **It is a top-level list:** it does not see inside the stats accumulator (one entry),
+behind a reference, or into a callback. The save's completeness is B2's to prove — a snapshot restored in a fresh
+process finishing identical to an uninterrupted season.
+
+★ **How Phase 114 proves it.** Day by day, week by week and random chunks against one call — a stock career's two
+seasons, the legacy stock season, a fixture-mte career season: every game, count, fingerprint, event, tournament and
+buy game, every file byte for byte, the page's month lines; a control drops one piece of live state between chunks and
+is named. The contract's refusals each by name, each leaving the run usable; a constructed fault on the walk and in a
+real career; `Dispose` in every state. The inventory against the classes, both directions, two controls. And the
+career folder at every stage: after the set-up, the six files the S122 build had written before its first tip (the
+career file and event record pinned from that build; the scouting file and the unfinished log — raw decimal bits, so
+never pinned from a Linux capture — proven against the same machine's one-call season, the log its exact front); after
+every advance, unchanged, the lock held; after the close, the one-call season's, the lock released. Files written by a
+live writer are read allowing writers (Windows refuses otherwise), and the one-byte control runs on a copy.
 
 ### How Phase 113 proves it
 
