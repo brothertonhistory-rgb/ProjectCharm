@@ -292,6 +292,14 @@ internal static partial class Program
         /// PlayedSeasonGame: index i is the fixture ordinal, and Results[i] /
         /// PossessionCounts[i] describe the same game.</summary>
         public List<PlayedSeasonGame> PlayedGames { get; init; } = new();
+        /// <summary>★ S122 — the fixture ordinals in the order they were PLAYED. The day loop plays
+        /// every game on its date, each day's games in ordinal order, so this is the season sorted by
+        /// (date, ordinal). Every list above is still indexed by ordinal; this is the only record of
+        /// play order. Phase 113 C1 reads it.</summary>
+        public IReadOnlyList<int> PlayOrder { get; init; } = Array.Empty<int>();
+        /// <summary>★ S122 — the season's span: November 1 and the championship Monday.</summary>
+        public DateOnly FirstLegalDay { get; init; }
+        public DateOnly LastLegalDay { get; init; }
         /// <summary>★ S98 — the conference prefix length. <c>Schedule</c> is conference-only
         /// (a bracket cannot exist before it is played), so this is <c>Schedule.Count</c> —
         /// carried explicitly because the slice that C1 takes must name its own length rather
@@ -1711,7 +1719,8 @@ internal static partial class Program
         bool buyGamesOffForTest = false,
         DivvyResult? rostersInHand = null,
         bool bootstrapPeopleForTest = false,
-        int? seasonYear = null)
+        int? seasonYear = null,
+        SeasonPlayOrder? playOrderForTest = null)
     {
         // ★ S114 — rosters handed in (the turnover's season two) skip the draft and nothing
         //   else: every consumer below reads Pool / Rosters / PersonIds and the pool by index,
@@ -1960,12 +1969,25 @@ internal static partial class Program
 
         var wins = world.Schools.ToDictionary(s => s.Id, _ => 0);
         var losses = world.Schools.ToDictionary(s => s.Id, _ => 0);
-        var results = new List<SeasonGameResult>(schedule.Count);
-        var possessionCounts = new List<int>(schedule.Count);
+        //  ★ S122 — EVERY PER-GAME OUTPUT IS ADDRESSED BY FIXTURE ORDINAL FROM THE MOMENT THE GAME
+        //    IS PLAYED (K3). Games no longer play in ordinal order, so nothing here is appended:
+        //    slot g holds fixture ordinal g's game, empty until it plays, and the finished lists are
+        //    materialized after the loop. No reader — during the season or after — ever sees a list
+        //    whose index means anything but the fixture ordinal. Sized once the season's sources
+        //    are known (below); `resultSlots` is a list because the conference tournaments hold a
+        //    reference to it before then, to read their league's results the morning they open.
+        var resultSlots = new List<SeasonGameResult?>();
+        int?[] possessionSlots = Array.Empty<int?>();
         // ★ S112 — each side's own possessions, carried rather than halved (see SidePossessions).
-        var sidePossessions = new List<SidePossessionCount>(schedule.Count);
-        var putbackAudits = new List<GamePutbackAudit>(schedule.Count);   // ★ S118, Phase 108 only
-        var laneAudits = new List<GameLaneAudit>(schedule.Count);         // ★ S120, Phase 111 only
+        SidePossessionCount?[] sideSlots = Array.Empty<SidePossessionCount?>();
+        GamePutbackAudit?[] putbackSlots = Array.Empty<GamePutbackAudit?>();   // ★ S118, Phase 108 only
+        GameLaneAudit?[] laneSlots = Array.Empty<GameLaneAudit?>();           // ★ S120, Phase 111 only
+        PlayedSeasonGame?[] playedSlots = Array.Empty<PlayedSeasonGame?>();
+        //  ★ S122 (K2) — the log stays in fixture order for now: each game's block is built when it
+        //    is played and held here, then appended in ordinal order after the season. The log's
+        //    bytes are unchanged; the save session redesigns it around play order (O-134).
+        (GameBlockFactsV1 Facts, List<PerGameStatRowV1> Rows)?[] logSlots =
+            Array.Empty<(GameBlockFactsV1, List<PerGameStatRowV1>)?>();
         // ★ S121 — each man's seconds and each school's games, for the next camp's minutes share.
         var secondsByPool = new Dictionary<int, long>();
         var teamGames = new Dictionary<int, int>();
@@ -1999,8 +2021,6 @@ internal static partial class Program
                 history.Path, history.HistoryId, history.WorldFingerprint, fingerprint,
                 schedule[0].SeasonId!.Value, roster);
         }
-
-        var playedGames = new List<PlayedSeasonGame>(schedule.Count);
 
         //  ★ S98 — ONE GAME, RUN ONCE, WHATEVER KIND IT IS. This body is the pre-S98 loop
         //  body lifted whole into a local function so that a tournament fixture goes through
@@ -2096,9 +2116,9 @@ internal static partial class Program
             teamGames[sg.AwayId] = (teamGames.TryGetValue(sg.AwayId, out var ag) ? ag : 0) + 1;
 
             // ...and diff AFTER the last one. Emission is the games-played delta, never a
-            // credits delta read after the fact.
+            // credits delta read after the fact. ★ S122 — built now, appended after the season (K2).
             if (gameLog is not null && retentionBefore is not null)
-                gameLog.AppendGame(
+                logSlots[g] = (
                     new GameBlockFactsV1(
                         sg.GameId!.Value, g, sg.HomeId, sg.AwayId,
                         string.Equals(sg.Kind, "conf", StringComparison.Ordinal),
@@ -2121,20 +2141,23 @@ internal static partial class Program
             // full stop (a flipped attribution passes conservation and determinism —
             // Phase 55's replay check exists to catch exactly that).
             // S89: the result carries the FIXTURE's numbers — the same game, not a new one.
-            results.Add(new SeasonGameResult(
+            if (resultSlots[g] is not null)
+                throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED: fixture ordinal {g} was played twice.");
+            resultSlots[g] = new SeasonGameResult(
                 sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods,
-                sg.SeasonId, sg.GameId));
-            possessionCounts.Add(result.Possessions.Count);
+                sg.SeasonId, sg.GameId);
+            possessionSlots[g] = result.Possessions.Count;
             // ★ S112 — every possession record already names who had the ball, so the split is a
             //   COUNT, never total/2. The record builder asserts the two sides sum to the total.
-            sidePossessions.Add(new SidePossessionCount(
+            sideSlots[g] = (new SidePossessionCount(
                 result.Possessions.Count(r => r.Offense == TeamSide.Home),
                 result.Possessions.Count(r => r.Offense == TeamSide.Away)));
             // ★ S118 -- the putback audit (Phase 108). Pure arithmetic on records already in hand.
             {
                 int Sum(TeamSide side, Func<PossessionRecord, int> f) =>
                     result.Possessions.Where(r => r.Offense == side).Sum(f);
-                putbackAudits.Add(new GamePutbackAudit(
+                putbackSlots[g] = (new GamePutbackAudit(
                     result.Possessions.Sum(r => r.PutbackFtShooterChanged),
                     Sum(TeamSide.Home, r => r.Fga), Sum(TeamSide.Away, r => r.Fga),
                     Sum(TeamSide.Home, r => r.Fta), Sum(TeamSide.Away, r => r.Fta),
@@ -2142,8 +2165,8 @@ internal static partial class Program
                     Sum(TeamSide.Home, r => r.FtaBySlot.Unattr), Sum(TeamSide.Away, r => r.FtaBySlot.Unattr),
                     result.Possessions.Sum(r => r.ScrambleFtShooterStamped)));
             }
-            laneAudits.Add(BuildLaneAudit(result.Possessions));   // ★ S120 -- Phase 111
-            playedGames.Add(pg);
+            laneSlots[g] = BuildLaneAudit(result.Possessions);   // ★ S120 -- Phase 111
+            playedSlots[g] = pg;
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
             else ties++;   // assumption-1 says impossible; counted so it can never hide
@@ -2152,41 +2175,86 @@ internal static partial class Program
         }
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  ★ EXECUTED LAST, DATED FIRST — see the header of Program.Season.Brackets.cs.
+        //  ★ S122 — THE SEASON ON THE CALENDAR (Program.Season.Calendar.cs).
         //
-        //  The conference slate plays at loop index g = 0 .. N-1, UNCHANGED and bit for
-        //  bit, so `baseSeed + 2g` hands every conference game the exact seeds it had
-        //  before this session existed. The tournament games APPEND at N .. N+M-1 and
-        //  carry NOVEMBER DATES.
+        //  Every game keeps the fixture ordinal it has always had — the league slate at
+        //  0 .. N-1, then the brackets, the showcases, the conference tournaments and the
+        //  buy games, each kind numbered after the last — so `baseSeed + 2g` hands every
+        //  game the exact seeds it had before this session existed. What changed is the
+        //  order they are PLAYED in: one day at a time from November 1 to the championship
+        //  Monday, each day's games in ordinal order. From S98 to S121 they were played in
+        //  ordinal order, November tournaments after March; that is retired.
         //
-        //  This looks wrong and is correct. `g` is both the engine seed input and the
-        //  retention log's fixture ordinal, so slotting tournament games into calendar
-        //  order would shift every conference index and re-roll the entire season's
-        //  basketball. Do not "fix" it.
+        //  The sources are built here, before the first tip: every game's ordinal and date
+        //  is known now, even a bracket's later rounds, whose sides depend on results but
+        //  whose dates do not.
         // ══════════════════════════════════════════════════════════════════════════
-        for (var g = 0; g < schedule.Count; g++)
-        {
-            PlayOneGame(new PlayedSeasonGame(schedule[g], g));
-            if (verbose && (g + 1) % 500 == 0)
-                Console.WriteLine($"  ... {g + 1}/{schedule.Count} conference games played");
-        }
-
         var prestigeById = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
-        var brackets = MtePlayBrackets(
-            seating, prestigeById, reservations, seasonIdOfRun, schedule.Count, seasonYearOfRun,
-            pg => PlayOneGame(pg));
-        if (verbose && brackets.GameCount > 0)
-            Console.WriteLine($"  ... {brackets.GameCount} tournament games played");
+        var leagueSource = new SeasonStaticSource(
+            "the league slate",
+            schedule.Select((sg, i) => new PlayedSeasonGame(sg, i)).ToList());
+        var bracketSources = MteBracketSources(
+            seating, prestigeById, reservations, seasonIdOfRun, schedule.Count, seasonYearOfRun);
+        var bracketGameCount = bracketSources.Sum(b => b.Count);
+        //  ★ S104 — THE SHOWCASES, NUMBERED AFTER EVERY BRACKET (see MteExpectedBracketSlots — the
+        //    reservation walk and this numbering are the same order, and they must stay that way).
+        var showcaseSource = new MteShowcaseSource(
+            seating, reservations, seasonIdOfRun, schedule.Count + bracketGameCount, seasonYearOfRun);
+        var eventGameCount = bracketGameCount + showcaseSource.Count;
+        //  ★ S110 — THE CONFERENCE TOURNAMENTS, NUMBERED AFTER EVERY EVENT GAME, ascending
+        //    conference id then topology game index 0..6, as the reservation walk
+        //    (ConfTourneyExpectedSlots) spends them. Each reads its league's results from
+        //    `resultSlots` the morning it opens — league results only, by ordinal, so a
+        //    tournament win can never become a league win.
+        var (confTourneySources, leaguesTooSmall) = ConfTourneySources(
+            world, seasonYearOfRun, schedule, resultSlots,
+            confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount);
+        var confTourneyGameCount = confTourneySources.Sum(c => c.Count);
+        //  ★ S111 — THE BUY GAMES, NUMBERED AFTER EVERY CONFERENCE TOURNAMENT GAME, in the dater's
+        //    pairing order, which is also the reservation order.
+        var buySource = new BuyGameSource(
+            buyPlans, buyReservations, seasonIdOfRun,
+            schedule.Count + eventGameCount + confTourneyGameCount);
 
-        // ★ S104 — THE SHOWCASES, APPENDED AFTER EVERY BRACKET. Their ordinals start where
-        //   the brackets stopped, which is what leaves every tournament game on the engine
-        //   seed it has always had (see MteExpectedBracketSlots — the reservation walk and
-        //   this walk are the same order, and they must stay that way).
-        var showcases = MtePlayShowcases(
-            seating, reservations, seasonIdOfRun, schedule.Count + brackets.GameCount, seasonYearOfRun,
-            pg => PlayOneGame(pg));
-        if (verbose && showcases.GameCount > 0)
-            Console.WriteLine($"  ... {showcases.GameCount} showcase games played");
+        var totalGames = schedule.Count + eventGameCount + confTourneyGameCount + buySource.Count;
+        resultSlots.AddRange(Enumerable.Repeat<SeasonGameResult?>(null, totalGames));
+        possessionSlots = new int?[totalGames];
+        sideSlots = new SidePossessionCount?[totalGames];
+        putbackSlots = new GamePutbackAudit?[totalGames];
+        laneSlots = new GameLaneAudit?[totalGames];
+        playedSlots = new PlayedSeasonGame?[totalGames];
+        logSlots = new (GameBlockFactsV1, List<PerGameStatRowV1>)?[totalGames];
+
+        var sources = new List<SeasonGameSource> { leagueSource };
+        sources.AddRange(bracketSources);
+        sources.Add(showcaseSource);
+        sources.AddRange(confTourneySources);
+        sources.Add(buySource);
+        var calendarPlay = SeasonPlayCalendar(
+            sources, seasonYearOfRun, playOrderForTest ?? SeasonPlayOrder.Calendar,
+            pg => PlayOneGame(pg),
+            verbose
+                ? (month, n) => Console.WriteLine(FormattableString.Invariant($"  ... {month}: {n:N0} games"))
+                : null);
+
+        //  The finished lists, in fixture-ordinal order — every slot filled, or the season refuses.
+        static List<T> Materialize<T>(IReadOnlyList<T?> slots, string what) where T : class
+            => slots.Select((x, i) => x ?? throw new InvalidOperationException(
+                   $"SEASON INVARIANT VIOLATED: fixture ordinal {i} has no {what}.")).ToList();
+        static List<T> MaterializeValue<T>(IReadOnlyList<T?> slots, string what) where T : struct
+            => slots.Select((x, i) => x ?? throw new InvalidOperationException(
+                   $"SEASON INVARIANT VIOLATED: fixture ordinal {i} has no {what}.")).ToList();
+        var results = Materialize(resultSlots, "result");
+        var possessionCounts = MaterializeValue(possessionSlots, "possession count");
+        var sidePossessions = Materialize(sideSlots, "possession split");
+        var putbackAudits = Materialize(putbackSlots, "putback audit");
+        var laneAudits = Materialize(laneSlots, "lane audit");
+        var playedGames = Materialize(playedSlots, "played game");
+
+        var brackets = MteBracketOutcome(bracketSources);
+        var showcases = showcaseSource.Outcome();
+        var confTourneys = ConfTourneyOutcome(confTourneySources, leaguesTooSmall);
+        var buyGames = buySource.Outcome();
 
         // ★ ONE played-fact map across both kinds. The record's seat-identity round-trip is a
         //   single code path, so a showcase's seats are validated exactly as rigorously as a
@@ -2194,55 +2262,20 @@ internal static partial class Program
         var seatsPlayedAll = new Dictionary<int, IReadOnlyDictionary<int, int>>();
         foreach (var kv in brackets.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
         foreach (var kv in showcases.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
-        var eventGameCount = brackets.GameCount + showcases.GameCount;
-
-        // ══════════════════════════════════════════════════════════════════════════
-        //  ★ S110 — THE CONFERENCE TOURNAMENTS, APPENDED AFTER EVERY EVENT GAME.
-        //
-        //  Their ordinals start where the showcases stopped, which is what leaves every
-        //  conference game AND every event game on the engine seed it has always had.
-        //  The reservation walk (ConfTourneyExpectedSlots) and this walk are the same
-        //  order — ascending conference id, then topology game index 0..6 — and they
-        //  must stay that way.
-        //
-        //  The records that seed the fields are derived from `schedule` and the first
-        //  `schedule.Count` results, both of which are complete and frozen by now and
-        //  neither of which these games can ever enter. That is what makes "a tournament
-        //  win does not become a league win" true by construction rather than by care.
-        // ══════════════════════════════════════════════════════════════════════════
-        var confTourneys = ConfTourneyPlaySeason(
-            world, seasonYearOfRun, schedule, results,
-            confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount,
-            pg => PlayOneGame(pg));
-        if (verbose && confTourneys.GameCount > 0)
-            Console.WriteLine($"  ... {confTourneys.GameCount} conference tournament games played " +
-                              $"({confTourneys.LeaguesPlayed} leagues)");
-
-        // ══════════════════════════════════════════════════════════════════════════
-        //  ★ S111 — THE BUY GAMES, APPENDED AFTER EVERY CONFERENCE TOURNAMENT GAME.
-        //
-        //  November games playing after March ones, for the reason stated above the league
-        //  loop: the ordinal is the engine seed, so appending is the only move that leaves
-        //  every earlier game on the seed it has always had. They play in the dater's pairing
-        //  order, which is also the reservation order.
-        //
-        //  Records only: the conference tournament fields were seeded before this line from
-        //  league results alone, so nothing a buy game does can reach them.
-        // ══════════════════════════════════════════════════════════════════════════
-        var buyGames = BuyPlaySeason(
-            buyPlans, buyReservations, seasonIdOfRun,
-            schedule.Count + eventGameCount + confTourneys.GameCount,
-            pg => PlayOneGame(pg));
-        if (verbose && buyGames.GameCount > 0)
-            Console.WriteLine($"  ... {buyGames.GameCount} non-conference games played");
 
         //  One block per fixture PLAYED and no other — league, event, conference tournament
-        //  and buy game. The writer refuses to publish a partial season rather than leaving
-        //  a plausible-looking short file behind.
+        //  and buy game — appended in fixture order (K2). The writer refuses to publish a
+        //  partial season rather than leaving a plausible-looking short file behind.
         if (gameLog is not null)
         {
-            gameLog.Finalize(schedule.Count + eventGameCount + confTourneys.GameCount
-                             + buyGames.GameCount);
+            for (var g = 0; g < totalGames; g++)
+            {
+                var block = logSlots[g] ?? throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED: fixture ordinal {g} played but built no log block.");
+                gameLog.AppendGame(block.Facts, block.Rows);
+                logSlots[g] = null;
+            }
+            gameLog.Finalize(totalGames);
             gameLog.Dispose();
         }
 
@@ -2311,6 +2344,9 @@ internal static partial class Program
             NonConferenceDates = nonConferenceDates,
             Contracts = contracts,
             PlayedGames = playedGames,
+            PlayOrder = calendarPlay.PlayOrder,
+            FirstLegalDay = calendarPlay.FirstLegalDay,
+            LastLegalDay = calendarPlay.LastLegalDay,
             ConferenceGameCount = schedule.Count,
             TournamentGameCount = eventGameCount,
             ShowcaseGameCount = showcases.GameCount,

@@ -13,15 +13,14 @@ namespace Charm.Harness;
 //  to a full placement on the window's own nights, and its finishes handed back
 //  for the permanent record.
 //
-//  ★ EXECUTED LAST, DATED FIRST — the single most important structural fact here,
-//  and the one most likely to be "tidied" later by somebody who has not read this
-//  paragraph. The season loop's index `g` is BOTH the engine seed input
-//  (base + 2g, base + 2g + 1) and the retention log's fixture ordinal. Inserting
-//  tournament games in NOVEMBER ORDER — before most of the conference slate —
-//  would shift every conference index and re-roll the entire season's basketball.
-//  So the brackets are appended after the last conference game and carry November
-//  DATES. Play order and calendar order are different things and this session is
-//  the first to make them differ.
+//  ★ NUMBERED LAST, PLAYED ON THEIR DATES — the single most important structural
+//  fact here. A game's fixture ordinal is BOTH the engine seed input (base + 2g,
+//  base + 2g + 1) and the retention log's fixture ordinal. Numbering tournament games
+//  in NOVEMBER ORDER — before most of the conference slate — would shift every
+//  conference index and re-roll the entire season's basketball. So the brackets are
+//  NUMBERED after the last conference game and carry November DATES. From S98 to S121
+//  they were also PLAYED last; since S122 the season's day loop plays every game on
+//  its date (Program.Season.Calendar.cs), and the numbering is untouched.
 //
 //  That is only safe because season game execution is independent game to game:
 //  both sides are rebuilt from the per-school row tables for every game, the two
@@ -174,7 +173,7 @@ internal static partial class Program
     /// (tier, id) order would slide every tournament game's ordinal along and re-roll every
     /// tournament result in the country — which is precisely the byte-identity §3.3 exists to
     /// protect. Appending the new kind keeps every pre-S104 tournament game on the seed it
-    /// has always had. Play order and calendar order are already different things here (see
+    /// has always had. Numbering order and calendar order are different things here (see
     /// this file's header); this is the same trick applied to a second kind.</para>
     private static List<BracketSlotKey> MteExpectedBracketSlots(EventSeatingOutcome seating)
     {
@@ -185,9 +184,10 @@ internal static partial class Program
         return slots;
     }
 
-    /// <summary>★ THE CANONICAL PLAY ORDER, DEFINED ONCE AND WALKED BY EVERYTHING —
-    /// reservations, play, and the fingerprint. Tournaments in (tier, id), then showcases in
-    /// (tier, id).</summary>
+    /// <summary>★ THE CANONICAL NUMBERING ORDER, DEFINED ONCE AND WALKED BY EVERYTHING —
+    /// reservations, fixture ordinals, and the fingerprint. Tournaments in (tier, id), then
+    /// showcases in (tier, id). ★ S122: no longer the order games are PLAYED in — the day loop
+    /// plays each on its date — but still the order they are numbered in.</summary>
     private static IEnumerable<SeatedEvent> MteEventPlayOrder(EventSeatingOutcome seating)
         => seating.Active.Where(MteEventPlays)
                   .OrderBy(e => e.IsShowcase ? 1 : 0)
@@ -303,102 +303,166 @@ internal static partial class Program
         IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> SeatsPlayed,
         int GameCount);
 
-    /// <summary>Play every complete active field to a full placement.
+    /// <summary>★ S122 — ONE BRACKET EVENT AS A CALENDAR SOURCE. The S98 walk, turned inside out:
+    /// the season's day loop decides when each game plays, and this class owns everything else —
+    /// the seeds, the route table, who fills each later slot, the placings.
     ///
-    /// <para><paramref name="play"/> runs one prepared fixture through the ordinary season-game
-    /// execution path and hands back its score. Keeping the engine on the other side of a
-    /// delegate is what lets this file own the bracket and own nothing else.</para>
+    /// <para>Seeds are resolved into occupancy as results arrive: a round-one game reads its two
+    /// seeds straight from the route table, and every later game is filled by the arrows pointing
+    /// at it. A game whose two slots are not both filled when it comes up is refused rather than
+    /// played with a placeholder — which, now that every later round is dated after its feeders
+    /// (asserted on the slot table), can only mean a malformed route table.</para>
     ///
-    /// <para>Seeds are resolved into occupancy as results arrive: a round-one game reads its
-    /// two seeds straight from the route table, and every later game is filled by the arrows
-    /// pointing at it. A game whose two slots are not both filled when it comes up is a
-    /// malformed route table, and it says so rather than playing a placeholder.</para></summary>
-    private static BracketPlayOutcome MtePlayBrackets(
+    /// <para>The fixture ordinal is <c>firstOrdinal + route index</c>, the same number the S98
+    /// walk gave it — events in <c>MteEventPlayOrder</c>, each event's games in route order — so
+    /// every bracket game keeps the engine seed it has always had.</para></summary>
+    private sealed class MteBracketSource : SeasonGameSource
+    {
+        private readonly SeatedEvent _event;
+        private readonly BracketPlan _plan;
+        private readonly BracketRoute[] _routes;
+        private readonly int _firstOrdinal;
+        private readonly DateOnly[] _dates;
+        private readonly int[][] _occupancy;
+        private readonly bool[] _played;
+        private readonly Dictionary<int, int> _placeBySeat = new();
+        private readonly IReadOnlyDictionary<BracketSlotKey, GameId> _reservations;
+        private readonly SeasonId? _seasonId;
+
+        /// <param name="datesForTest">Phase 113 only: replaces the round dates so a later round
+        /// can be constructed on its feeder's own day. Null on every production path.</param>
+        public MteBracketSource(
+            SeatedEvent e, BracketPlan plan, int firstOrdinal,
+            IReadOnlyDictionary<BracketSlotKey, GameId> reservations, SeasonId? seasonId,
+            DateOnly[]? datesForTest = null)
+        {
+            _event = e;
+            _plan = plan;
+            _routes = MteBracketRoutesFor(e);
+            _firstOrdinal = firstOrdinal;
+            _reservations = reservations;
+            _seasonId = seasonId;
+            for (var i = 0; i < _routes.Length; i++)
+                if (_routes[i].GameIndex != i)
+                    throw new InvalidOperationException(
+                        $"BRACKET: {plan.EventName}'s route {i.ToString(CultureInfo.InvariantCulture)} is numbered " +
+                        $"{_routes[i].GameIndex.ToString(CultureInfo.InvariantCulture)}; a route table is indexed by its own game numbers.");
+            var rounds = _routes.Max(r => r.Round) + 1;
+            _dates = datesForTest ?? _routes.Select(r => MteRoundDate(plan, r.Round, rounds)).ToArray();
+            _occupancy = new int[_routes.Length][];
+            for (var i = 0; i < _routes.Length; i++) _occupancy[i] = new[] { 0, 0 };
+            _played = new bool[_routes.Length];
+        }
+
+        public int EventId => _plan.EventId;
+        public IReadOnlyDictionary<int, int> FinishBySeat => _placeBySeat;
+        public IReadOnlyDictionary<int, int> SeatsPlayed => _event.Seats.ToDictionary(s => s.Seat, s => s.SchoolId);
+
+        public override string Name => _plan.EventName;
+        public override int Count => _routes.Length;
+        public override int Ordinal(int local) => _firstOrdinal + local;
+        public override DateOnly? Date(int local) => _dates[local];
+
+        public override IEnumerable<int> Feeders(int local)
+            => _routes.Where(r => r.WinnerToGame == local || r.LoserToGame == local).Select(r => r.GameIndex);
+
+        public override PlayedSeasonGame Release(int local)
+        {
+            var route = _routes[local];
+            if (route.SeedA > 0) { _occupancy[local][0] = route.SeedA; }
+            if (route.SeedB > 0) { _occupancy[local][1] = route.SeedB; }
+            var a = _occupancy[local][0];
+            var b = _occupancy[local][1];
+            if (a == 0 || b == 0)
+                throw new InvalidOperationException(
+                    $"BRACKET: {_plan.EventName} slot " +
+                    $"{route.GameIndex.ToString(CultureInfo.InvariantCulture)} came up with an empty " +
+                    "side; the route table does not fill every game before it is played.");
+
+            var homeSeed = Math.Min(a, b);
+            var awaySeed = Math.Max(a, b);
+            var game = MteBuildTournamentGame(_plan, route, homeSeed, awaySeed, _reservations, _seasonId);
+            return new PlayedSeasonGame(
+                game, Ordinal(local),
+                _plan.EventTier, _plan.EventId, route.GameIndex, homeSeed, awaySeed);
+        }
+
+        public override void Finish(int local, PlayedSeasonGame played, int homeScore, int awayScore)
+        {
+            var route = _routes[local];
+            //  A tie is impossible — the engine plays overtime until somebody wins — and if
+            //  one ever arrived it must not silently advance the nominal home side.
+            if (homeScore == awayScore)
+                throw new InvalidOperationException(
+                    $"BRACKET: {_plan.EventName} slot " +
+                    $"{route.GameIndex.ToString(CultureInfo.InvariantCulture)} ended level; a bracket " +
+                    "game has no route for a tie.");
+
+            var homeSeed = played.HomeOriginalSeed!.Value;
+            var awaySeed = played.AwayOriginalSeed!.Value;
+            var winner = homeScore > awayScore ? homeSeed : awaySeed;
+            var loser  = homeScore > awayScore ? awaySeed : homeSeed;
+
+            if (route.WinnerPlace > 0)
+            {
+                _placeBySeat[_plan.SeatBySeed[winner - 1]] = route.WinnerPlace;
+                _placeBySeat[_plan.SeatBySeed[loser  - 1]] = route.LoserPlace;
+            }
+            else
+            {
+                _occupancy[route.WinnerToGame][route.WinnerToSlot] = winner;
+                _occupancy[route.LoserToGame][route.LoserToSlot]   = loser;
+            }
+            _played[local] = true;
+        }
+
+        public override void AssertComplete()
+        {
+            if (_played.Any(p => !p) || _placeBySeat.Count != _plan.FieldSize)
+                throw new InvalidOperationException(
+                    $"BRACKET: {_plan.EventName} finished with " +
+                    $"{_placeBySeat.Count.ToString(CultureInfo.InvariantCulture)} placings for a field of " +
+                    $"{_plan.FieldSize.ToString(CultureInfo.InvariantCulture)}.");
+        }
+    }
+
+    /// <summary>★ S122 — every complete active bracket field as a calendar source, in
+    /// <c>MteEventPlayOrder</c> (tournaments only — showcases are their own source), each
+    /// starting at the ordinal the S98 walk gave it.</summary>
+    private static List<MteBracketSource> MteBracketSources(
         EventSeatingOutcome seating,
         IReadOnlyDictionary<int, int> prestige,
         IReadOnlyDictionary<BracketSlotKey, GameId> reservations,
         SeasonId? seasonId,
         int conferenceGameCount,
-        int startYear,
-        Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play)
+        int startYear)
+    {
+        var sources = new List<MteBracketSource>();
+        var next = conferenceGameCount;
+        //  ★ S104 — TOURNAMENTS ONLY, and the filter is on the KIND. Showcases follow every
+        //    bracket in the ordinals, which is what keeps every tournament fixture ordinal (and
+        //    therefore every tournament engine seed) exactly where it was.
+        foreach (var e in MteEventPlayOrder(seating).Where(x => !x.IsShowcase))
+        {
+            var source = new MteBracketSource(e, MteSeedField(e, prestige, startYear), next, reservations, seasonId);
+            sources.Add(source);
+            next += source.Count;
+        }
+        return sources;
+    }
+
+    /// <summary>★ S122 — what the brackets did, assembled after the season in event order (the
+    /// order the S98 walk produced it in), so nothing downstream sees a play-order artifact.</summary>
+    private static BracketPlayOutcome MteBracketOutcome(IReadOnlyList<MteBracketSource> sources)
     {
         var finishes = new Dictionary<int, IReadOnlyDictionary<int, int>>();
         var seatsPlayed = new Dictionary<int, IReadOnlyDictionary<int, int>>();
-        var eventGameOrdinal = 0;
-
-        // ★ S104 — TOURNAMENTS ONLY, and the filter is on the KIND. Showcases are played by
-        //   MtePlayShowcases afterwards, which is what keeps every tournament fixture ordinal
-        //   (and therefore every tournament engine seed) exactly where it was.
-        foreach (var e in MteEventPlayOrder(seating).Where(x => !x.IsShowcase))
+        foreach (var s in sources)
         {
-            var plan = MteSeedField(e, prestige, startYear);
-            var routes = MteBracketRoutesFor(e);
-            var occupancy = new int[routes.Length][];
-            for (var i = 0; i < routes.Length; i++) occupancy[i] = new[] { 0, 0 };
-
-            var placeBySeat = new Dictionary<int, int>();
-
-            foreach (var route in routes)
-            {
-                if (route.SeedA > 0) { occupancy[route.GameIndex][0] = route.SeedA; }
-                if (route.SeedB > 0) { occupancy[route.GameIndex][1] = route.SeedB; }
-                var a = occupancy[route.GameIndex][0];
-                var b = occupancy[route.GameIndex][1];
-                if (a == 0 || b == 0)
-                    throw new InvalidOperationException(
-                        $"BRACKET: {plan.EventName} slot " +
-                        $"{route.GameIndex.ToString(CultureInfo.InvariantCulture)} came up with an empty " +
-                        "side; the route table does not fill every game before it is played.");
-
-                var homeSeed = Math.Min(a, b);
-                var awaySeed = Math.Max(a, b);
-                var game = MteBuildTournamentGame(plan, route, homeSeed, awaySeed, reservations, seasonId);
-
-                //  fixtureOrdinal = conferenceGameCount + eventGameOrdinal, stated literally so
-                //  nothing depends on reusing a loop variable correctly. The SAME ordinal feeds
-                //  the engine seeds, the retention log and PlayedGames.
-                var fixtureOrdinal = conferenceGameCount + eventGameOrdinal;
-                var played = new PlayedSeasonGame(
-                    game, fixtureOrdinal,
-                    plan.EventTier, plan.EventId, route.GameIndex, homeSeed, awaySeed);
-
-                var (homeScore, awayScore) = play(played);
-                eventGameOrdinal++;
-
-                //  A tie is impossible — the engine plays overtime until somebody wins — and if
-                //  one ever arrived it must not silently advance the nominal home side.
-                if (homeScore == awayScore)
-                    throw new InvalidOperationException(
-                        $"BRACKET: {plan.EventName} slot " +
-                        $"{route.GameIndex.ToString(CultureInfo.InvariantCulture)} ended level; a bracket " +
-                        "game has no route for a tie.");
-
-                var winner = homeScore > awayScore ? homeSeed : awaySeed;
-                var loser  = homeScore > awayScore ? awaySeed : homeSeed;
-
-                if (route.WinnerPlace > 0)
-                {
-                    placeBySeat[plan.SeatBySeed[winner - 1]] = route.WinnerPlace;
-                    placeBySeat[plan.SeatBySeed[loser  - 1]] = route.LoserPlace;
-                }
-                else
-                {
-                    occupancy[route.WinnerToGame][route.WinnerToSlot] = winner;
-                    occupancy[route.LoserToGame][route.LoserToSlot]   = loser;
-                }
-            }
-
-            if (placeBySeat.Count != plan.FieldSize)
-                throw new InvalidOperationException(
-                    $"BRACKET: {plan.EventName} finished with " +
-                    $"{placeBySeat.Count.ToString(CultureInfo.InvariantCulture)} placings for a field of " +
-                    $"{plan.FieldSize.ToString(CultureInfo.InvariantCulture)}.");
-
-            finishes[plan.EventId] = placeBySeat;
-            seatsPlayed[plan.EventId] = e.Seats.ToDictionary(s => s.Seat, s => s.SchoolId);
+            finishes[s.EventId] = s.FinishBySeat;
+            seatsPlayed[s.EventId] = s.SeatsPlayed;
         }
-
-        return new BracketPlayOutcome(finishes, seatsPlayed, eventGameOrdinal);
+        return new BracketPlayOutcome(finishes, seatsPlayed, sources.Sum(s => s.Count));
     }
 
     // ── The event-games fingerprint ──────────────────────────────────────────────

@@ -424,8 +424,10 @@ internal static partial class Program
                 // cases below. The golden is HAND-WRITTEN at S119, not captured from the writer, so
                 // the comparison is the writer against an independent expectation of the format.
                 // The lineage label is pinned for the comparison, because production mints it
-                // from Guid.NewGuid() and a golden cannot chase a random value.
-                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v3_golden.json");
+                // from Guid.NewGuid() and a golden cannot chase a random value. ★ S122 — the fixed-id
+                // door has two callers: this one, and Phase 113 C2 (a two-season career compared
+                // against the S121 build and against itself played in the old order).
+                var golden =Path.Combine(AppContext.BaseDirectory, "tools", "history_v3_golden.json");
                 var goldenFp = "sha256-v1:" + new string('0', 64);
                 var pGolden = Fresh("b10_golden");
                 using (HistoryStore.UseFixedHistoryIdForTests("0123456789abcdef0123456789abcdef"))

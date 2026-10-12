@@ -47,7 +47,7 @@ internal static partial class Program
         Console.WriteLine();
         Console.WriteLine("== Phase 89 — The brackets play (S98: seeded by prestige, played to a full " +
                           "placement on the window's own nights, neutral floor with nobody hosting, " +
-                          "executed last and dated first — the pre-S98 conference golden reproduced " +
+                          "numbered last and dated first — the pre-S98 conference golden reproduced " +
                           "WITH the brackets on, the route tables walked literally, the reservation " +
                           "ledger, the log's kind byte, host memory's blindness constructed so it " +
                           "would matter, the record's transaction and atomicity, and win percentage) ==");
@@ -332,8 +332,9 @@ internal static partial class Program
                       "4-field's on firstDay and lastDay — exact equalities, because the world " +
                       "validator refuses any other window length",
                       datesOk && checkedEvents == 4, $"{checkedEvents} events dated");
-                Check("C4b: ★ THE DATES SAY NOVEMBER while the play order says last — the two really " +
-                      "do differ, which is the whole point of executing last and dating first",
+                Check("C4b: ★ THE DATES SAY NOVEMBER while the NUMBERS say last — the ordinals come after the " +
+                      "whole league slate, which is what keeps every seed where it was; since S122 play follows the " +
+                      "dates (Phase 113)",
                       on.PlayedGames.Where(p => p.IsEventGame).All(p => p.Game.Date is { Month: 11 })
                       && on.PlayedGames.Where(p => p.IsEventGame).All(p => p.FixtureOrdinal >= on.ConferenceGameCount));
             }

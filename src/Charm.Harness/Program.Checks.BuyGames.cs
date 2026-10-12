@@ -506,7 +506,7 @@ internal static partial class Program
                 Check("C6c: ★ the sixth hash is the S120 capture",
                       run.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp,
                       run.ConferenceTournamentFingerprint[..8] + "…");
-                Check("C6d: and every buy game plays after every conference tournament game",
+                Check("C6d: and every buy game is NUMBERED after every conference tournament game (S122: each plays on its date)",
                       buys.All(p => p.FixtureOrdinal >= firstBuyOrdinal)
                       && run.PlayedGames.Where(p => p.IsConferenceTournamentGame).All(p => p.FixtureOrdinal < firstBuyOrdinal));
             }

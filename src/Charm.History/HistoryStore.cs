@@ -85,8 +85,10 @@ public sealed class HistoryStore : IDisposable
     /// writer at all.</para>
     ///
     /// <para>It carries no raw identity value out, so S89's actual seam is untouched: this
-    /// sets a label, it does not expose a number. Nothing on a production path may call it,
-    /// and Phase 80 B10 (the born-v3 golden) is the only caller in the tree.</para></summary>
+    /// sets a label, it does not expose a number. Nothing on a production path may call it.
+    /// Two callers in the tree: Phase 80 B10 (the born-v3 golden) and Phase 113 C2 (S122: a
+    /// two-season career pinned against the S121 build, and played twice — on the calendar and
+    /// in the old order — so the two can be compared byte for byte).</para></summary>
     public static IDisposable UseFixedHistoryIdForTests(string id)
     {
         if (!HistorySchemaV3.IsCanonicalHistoryId(id))

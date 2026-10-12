@@ -11290,23 +11290,25 @@ Four rulings from Emmett govern everything below:
 4. **A tournament game is an ordinary regular-season game.** It counts in the record. It feeds nothing else:
    prestige does not move until the season rolls over, and a finish is recorded and read by nobody.
 
-### ★ EXECUTED LAST, DATED FIRST
+### ★ NUMBERED LAST, DATED FIRST (S98) — AND PLAYED ON THE DATE (S122)
 
 The single most important structural fact in this session, and the one most likely to be "tidied" later.
 
 ```
 build the conference slate → date it → seat the fields   (S97, unchanged)
   → number the season AND reserve the bracket games      (the commit)
-  → play conference games at loop index g = 0 .. N-1     (UNCHANGED, bit for bit)
-  → play tournament games at loop index g = N .. N+M-1
+  → conference games hold fixture ordinals 0 .. N-1      (UNCHANGED, bit for bit)
+  → tournament games hold fixture ordinals N .. N+M-1
   → replace the record with the finishes
 ```
 
-The season loop's index `g` is **both** the engine seed input (`baseSeed + 2g`, `baseSeed + 2g + 1`) and the
-retention log's fixture ordinal. Slotting tournament games into *calendar* order — before most of the
+A game's fixture ordinal is **both** the engine seed input (`baseSeed + 2g`, `baseSeed + 2g + 1`) and the
+retention log's fixture ordinal. Numbering tournament games in *calendar* order — before most of the
 conference slate — would shift every conference index and re-roll the entire season's basketball. So the
-brackets are **appended** and carry **November dates**. Play order and calendar order are different things,
-and this is the first session that makes them differ.
+brackets are **numbered after** the league slate and carry **November dates**. From S98 to S121 they were also
+**played** in that order — November tournaments after March — which made play order and calendar order two
+different things. **S122 retired that half:** the season's day loop plays every game on its date and leaves the
+numbering exactly where it was (see "The season on the calendar").
 
 That is only safe because season game execution is independent game to game: both sides are rebuilt from the
 per-school row tables for every game, the two seeds come from the season seed alone, and no accumulator feeds
@@ -11564,9 +11566,9 @@ it as already spoken for.
 Two games on the event's single night, neutral floor, nobody hosting; the lower stored seat is the nominal
 home side, a box-score ordering only. Each is an ordinary regular-season non-conference game.
 
-**Showcases play AFTER every bracket, not interleaved.** The fixture ordinal is the engine seed, so
-appending the new kind is what leaves every tournament game on the seed it has always had. Play order and
-calendar order are already different things here.
+**Showcases are numbered AFTER every bracket, not interleaved.** The fixture ordinal is the engine seed, so
+appending the new kind is what leaves every tournament game on the seed it has always had. (S104–S121 also
+played them after every bracket; since S122 they play on their event's night like every game.)
 
 The record **completes with two results and no placement**: `finishBySeat` stays null forever, because
 nobody wins a showcase. "Played" is carried by the seats-played map rather than inferred from the presence
@@ -12206,10 +12208,14 @@ but authors no tournament day is refused by name rather than given an invented o
 
 ### Where they sit in the season
 
-★ **Executed LAST, after the showcases.** The fixture ordinal is both the engine seed input and the
+★ **Numbered LAST, after the showcases.** The fixture ordinal is both the engine seed input and the
 retention log's ordinal, so conference games hold 0..N−1, event games append after them, and these append
-after those. Slotting them anywhere earlier would slide every event game's ordinal along and re-roll every
-tournament result in the country. Ids are reserved by **count** at the same commit (seven per seating
+after those. Numbering them anywhere earlier would slide every event game's ordinal along and re-roll every
+tournament result in the country. ★ **Seeded the morning it opens (S122, C-67).** A league's tournament is
+seated when its first game comes up on the calendar, from **its own league's games only** — its members, its
+own fixtures, their results by ordinal (`ConfTourneyLeagueRecords`) — and refuses the season by name if any of
+those games is unplayed. The national `ConfTourneyConferenceRecords` stays as Phase 99's after-the-season
+recomputation; Phase 113 C4 proves the two give every member the same record and every field the same seeds. Ids are reserved by **count** at the same commit (seven per seating
 league, after the MTE slots), because the pairings are unknown then — round two is round one's result — so
 an id belongs to a **position**, not a team. The reservation walk and the play walk are the same walk:
 ascending conference id, then topology game index 0→6.
@@ -12278,13 +12284,14 @@ or what night — the matcher, the contract layer and the dater are finished and
 
 ### Where they sit, and why it must stay that way
 
-Appended last, at fixture ordinals starting where the conference tournaments stopped. **The ordinal is
+Numbered last, at fixture ordinals starting where the conference tournaments stopped. **The ordinal is
 the engine seed input**, so appending is the only move that leaves every earlier game on the seed it has
-always had; reordering re-rolls the season. November games therefore play after March ones in fixture
-order, which is a known and deliberate property of the season loop (S104, S110, now S111).
+always had; renumbering re-rolls the season. From S111 to S121 November buy games therefore *played* after
+March ones; since S122 every buy game plays on its date and keeps its number.
 
-Conference tournaments are seeded from the **league record** before this block runs, so nothing a buy
-game does can reach a field or a champion — proven, not reasoned (Phase 101 C6).
+Conference tournaments are seeded from the **league record** alone, so nothing a buy game does can reach a
+field or a champion — proven, not reasoned (Phase 101 C6, and since S122 by construction: the seeding reads
+only the league's own fixtures).
 
 ### The site fact — from the pairing's kind, never from a host id
 
@@ -12454,6 +12461,8 @@ off (turnovers, rim rate) would be fitting noise. It waits for a calibration ses
 ### The two commands
 
 - **`seasons <world> <seed>`** (S114) — legacy only, nothing saved: season one at `<seed>`, the turnover in memory, **then the camp (S121)**, season two at `<seed>+1` on the result. Season one is the standalone season bit for bit (Phase 104 C8). `--history` is refused by name. The turnover and the camp are one function (`StackedTurnoverAndCamp`) that Phase 104 calls too, so no path can play season two on undeveloped men.
+- **`day <world> <YYYY-MM-DD> --history <career>`** (S122) — one day of a career: every game played that day, in the
+order it was played. See "The season on the calendar".
 - **`season <world> <seed> --history <career>`** (S115) — a career season. The first run is the bootstrap (the divvy, as it always was; S121 rolls every man's potential). Every later run: **read last season's people off its log and their hidden state off its scouting file → turn them over → number the freshmen → camp the returners and roll the freshmen → play → record.** The log the season writes, and the scouting file beside it, are what the next run starts from. **There is no separate roster file and no end-of-season snapshot** (Emmett's ruling 3, 2026-10-05): the chain of season logs is the save of what happened; the chain of scouting files (S121, ruling B) holds only what the staff knows and the player does not show.
 
 ### The turnover (S114 — a pure function of world, last season's rosters, and this season's seed)
@@ -12550,7 +12559,7 @@ STL BLK TOV PF ShF NsF OffF PTS Ref`. Site prints blank at home, `@` away, `N` n
 the games he played, labelled with his team's final record; its MP is the sum of the printed game minutes and every
 other cell equals his season row on the player page.
 
-**Date order, grouped by phase.** A game's fixture number is not its place in the calendar — tournaments are played
+**Date order, grouped by phase.** A game's fixture number is not its place in the calendar — tournaments are numbered
 last and dated first (S98) — so lines sort by **date** and the fixture number is only **Ref**, the box score's
 reference. The regular season (conference and non-conference interleaved by date; the Type column tells them apart)
 comes first, then the conference tournament, with the header repeated between them. Two facts make that order exist,
@@ -12597,7 +12606,7 @@ it, the star and its control; the legacy season unmoved.
 A player is no longer the same player every season. He arrives with a **hidden potential** and a **hidden work
 ethic**, both fixed for his career, and between seasons every returner goes through an **offseason camp** that makes
 him better — by how much depends on his potential, where the camp spends its time, how the camp goes, how much he
-played, and how hard he works. Weekly in-season practice is S122 (O-126), not this layer. Every number is a dial in
+played, and how hard he works. Weekly in-season practice (O-126) is a later session, not this layer — after the calendar runs the year (S122, C-67). Every number is a dial in
 config.json's `Development` section (Emmett's instruction for the arc: *"The prerogative is to make things editable and
 modifiable"*); the rulings are C-66.
 
@@ -12698,3 +12707,93 @@ up 8): athletic or size bigs 32.5%, solid-arriving guards 24.0%, everyone else 2
 three-camp career a man is funded in 5–8 distinct attributes. Shooter with very high potential and poor work ethic:
 Outside 52 → 64 / 72 / 82 (10th / 50th / 90th); a monster athlete's low-potential finishing 40 → 44 / 46 / 59 when
 you fund it, 38 / 39 / 40 when the computer chases his athleticism instead.
+
+## The season on the calendar (Session 122, 2026-10-10)
+
+★ **C-67 — the calendar runs the game** (Emmett: *"in general a calendar needs to be the background organization
+that runs the whole game. It should be July 8, 1987 or whatever and offseason recruiting, or whatever ends up going
+on then, is happening."*). This session is the first of three: (1) the season played on the calendar, day by day;
+(2) the calendar runs the year — offseason events on their dates — with save anywhere, reload anywhere and the sim
+buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135).
+
+### One day at a time
+
+`RunSeasonCore` no longer walks the league slate, then the brackets, the showcases, the conference tournaments and the
+buy games in turn. It builds every game's **source** before November 1 and hands them to one loop,
+`SeasonPlayCalendar` (`Program.Season.Calendar.cs`), which walks every day from the calendar's `FirstLegalDay`
+(November 1) to its `LastLegalDay` (the championship Monday), empty days included, and plays that day's games.
+
+```
+build every source (ordinal, date, feeders of every game — known now, even a final's)
+  → prove the slot table: ordinals contiguous, every game dated inside the season, every later round
+    dated strictly after its feeders
+  → for each day: release each game dated today (in ordinal order), play it, hand back the result
+  → materialize the per-game lists by ordinal; append the log blocks by ordinal; finalize
+```
+
+★ **No seed moved, so no game moved.** A game keeps its fixture ordinal, its two engine seeds and its game id; only the
+order it is *played* in changed. That is safe because no game reads another game's result except in two structural
+cases, both handled by construction: a later bracket or conference-tournament round reads its feeders' winners (and is
+dated strictly after them — asserted on the slot table, before anything plays), and a conference tournament is seeded
+from its league's results (read the morning it opens, refused by name if any is unplayed). Phase 113 C2 proves it on
+the whole season against the S121 build.
+
+★ **The loop owns play; a source never plays.** Static sources know every fixture before the season: the league slate,
+the showcases, the buy games. Dynamic sources fill later rounds from results: one per bracket event
+(`MteBracketSource`, the S98 route table turned inside out) and one per conference tournament (`ConfTourneySource`).
+A source answers four questions — a game's ordinal, its date, its feeders, and, when its turn comes, the game itself
+(`Release`) — and is handed the result (`Finish`). Their outcomes (finishes, champions, rows) are assembled after the
+loop in the order the old walks produced them, so every fingerprint, record file and page reads the same.
+
+★ **Within a day, ordinal order (K5).** No game reads a same-day result — a school never plays twice in a day (refused
+as each game is released) and a later round never shares its feeder's day (refused before the first tip) — so the order
+within a day cannot change a result. Ordinal order makes it deterministic.
+
+### The lists and the log (K2, K3)
+
+Every per-game output — `Results`, `PossessionCounts`, `SidePossessions`, the two audits, `PlayedGames` — is **written
+to its ordinal's slot** the moment the game is played and materialized after the loop, so no reader ever sees a list
+whose index means anything but the fixture ordinal. `PlayOrder` is new: the ordinals in the order they were played.
+
+The season log is **unchanged on disk**: each game's block is built when it is played, held, and appended in ordinal
+order after the season. The cost is honest — a season that crashes mid-run leaves no game blocks, rather than a prefix
+nothing could resume anyway (S90). The save session redesigns the log around play order (O-134), so the format breaks
+once, not twice.
+
+The one number allowed to differ: the season page's **floating-point calibration totals** now add up in calendar order
+and may move in their last printed digit. Nothing asserts them.
+
+### The day page
+
+`day <world> <YYYY-MM-DD> --history <career>` (`Program.DayPage.cs`), a career page beside `player`, `gamelog` and
+`box`: the weekday and date, then every game that day, one line each — `<away> <score> @ <home> <score>`, or
+`<away> <score> vs. <home> <score>   (neutral)` on a floor nobody hosts, ` (OT)` / ` (2OT)` as the game log prints them —
+then `N games`, or `No games on <date>.` (Emmett: *"a list of every game. Texas @ LSU / Oral Roberts @ South Dakota
+State / etc... all the way down"*.) The season is the one whose basketball year, July 1 to June 30, holds the date.
+The page reads the log only; "in the order it was played" is ordinal order within the day, which Phase 113 C1 proves is
+the play order. Refused by name: no `--history`, a date that is not a date, a date before the career's first season or
+past its last played one, a season with no record.
+
+### What stays fixed for now (O-132)
+
+The dice. Every game of a suite run rolls the seeds its ordinal gives it, so a season replayed is the same season —
+that is what makes "nothing moved" provable. The live game will roll fresh dice on every sim (Emmett: *"if i sim a
+game 10,000 times i should get 10,000 unique results right?"*), while the suite keeps fixed seeds. That belongs to the
+save session.
+
+### How Phase 113 proves it
+
+The order: every game once, dates never backwards, no school twice a day, on two stock seasons and an mte season, with
+the old order as the control. Nothing moved: season one's every game block, its event record and the career file
+pinned from the S121 build (whole numbers only — the roster section and the scouting file hold raw double bits, so the
+cross-platform pin stops there, CONVENTIONS §2); and on the machine that runs it, the same two-season career played on
+the calendar and in the old order writes every file byte for byte, with a one-byte control. Every day's games are the
+games dated that day. Later rounds dated and played after their feeders; every tournament seeded after its league's
+last game onto the field the national record gives; a too-early tournament and a same-day feeder refused by name. The
+day page line for line against an independent read of the log, on six days, and five refusals. The legacy and stacked
+seasons play by day; the legacy season is the S120 capture.
+
+### Stock numbers (seed 20260720; page-only)
+
+117 days with games, November 2 to March 19; the busiest Saturday, February 13, with 152; November 1,309, December 720,
+January 1,474, February 1,210, March 644; the longest stretch without a game 8 days, from December 20.

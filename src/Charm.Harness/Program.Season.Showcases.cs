@@ -19,9 +19,10 @@ namespace Charm.Harness;
 //  the charge has to happen before requests are built. This file is only the
 //  simulation half: it takes pairings that already exist and plays them.
 //
-//  ★ PLAYED AFTER EVERY BRACKET, NOT INTERLEAVED. See MteExpectedBracketSlots:
+//  ★ NUMBERED AFTER EVERY BRACKET, NOT INTERLEAVED. See MteExpectedBracketSlots:
 //  the fixture ordinal is the engine seed, so appending the new kind is what
-//  keeps every tournament game bit-identical to its pre-S104 self.
+//  keeps every tournament game bit-identical to its pre-S104 self. (S122: played
+//  on its date by the season's day loop, like every game; numbered as before.)
 //
 //  ★ THE NEUTRAL FLOOR, exactly as a tournament game has it. Nobody hosts a
 //  showcase game; the lower SEAT number is the nominal home side, which is a
@@ -59,54 +60,77 @@ internal static partial class Program
         new Dictionary<int, IReadOnlyDictionary<int, int>>(),
         0);
 
-    /// <summary>Play every complete active showcase.
+    /// <summary>★ S122 — EVERY SHOWCASE AS ONE CALENDAR SOURCE. Both games of every showcase are
+    /// known before the season (the pairings exist the moment the field completes at seating), so
+    /// this is a static source: the fixtures are built up front, the day loop plays each on its
+    /// event's day, and the results are kept by position.
     ///
-    /// <para><paramref name="play"/> runs one prepared fixture through the ordinary
-    /// season-game execution path and hands back its score — the same delegate seam the
-    /// brackets use, and for the same reason: the engine stays on the other side of it so
-    /// this file owns the showcase and owns nothing else.</para>
-    ///
-    /// <para><paramref name="firstOrdinal"/> is where this run's showcase games start, which
-    /// is after the conference slate AND after every bracket game. It is passed in rather
-    /// than recomputed so there is exactly one arithmetic for it.</para></summary>
-    private static ShowcasePlayOutcome MtePlayShowcases(
-        EventSeatingOutcome seating,
-        IReadOnlyDictionary<BracketSlotKey, GameId> reservations,
-        SeasonId? seasonId,
-        int firstOrdinal,
-        int startYear,
-        Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play)
+    /// <para><paramref name="firstOrdinal"/> is where this run's showcase games start, which is
+    /// after the conference slate AND after every bracket game — the S104 numbering, unchanged,
+    /// so every showcase game keeps its engine seed.</para></summary>
+    private sealed class MteShowcaseSource : SeasonGameSource
     {
-        var results = new List<ShowcaseResult>();
-        var seatsPlayed = new Dictionary<int, IReadOnlyDictionary<int, int>>();
-        var ordinal = 0;
+        private readonly List<(SeatedEvent Event, ShowcasePairing Pairing, PlayedSeasonGame Played)> _games = new();
+        private readonly List<SeatedEvent> _events = new();
+        private readonly ShowcaseResult?[] _results;
 
-        foreach (var e in MteEventPlayOrder(seating).Where(x => x.IsShowcase))
+        public MteShowcaseSource(
+            EventSeatingOutcome seating,
+            IReadOnlyDictionary<BracketSlotKey, GameId> reservations,
+            SeasonId? seasonId,
+            int firstOrdinal,
+            int startYear)
         {
-            var day = MteWindowDate(e.FirstDay, startYear);
-            foreach (var pairing in MteShowcasePairingsOf(e))
+            foreach (var e in MteEventPlayOrder(seating).Where(x => x.IsShowcase))
             {
-                var game = MteBuildShowcaseGame(e, pairing, day, reservations, seasonId);
-                var played = new PlayedSeasonGame(
-                    game, firstOrdinal + ordinal,
-                    e.Tier, e.EventId, pairing.GameIndex,
-                    pairing.SeatA, pairing.SeatB);
-
-                var (homeScore, awayScore) = play(played);
-                ordinal++;
-
-                results.Add(new ShowcaseResult(
-                    e.EventId, pairing.GameIndex, pairing.SeatA, pairing.SeatB,
-                    pairing.SchoolAId, pairing.SchoolBId, homeScore, awayScore));
+                _events.Add(e);
+                var day = MteWindowDate(e.FirstDay, startYear);
+                foreach (var pairing in MteShowcasePairingsOf(e))
+                {
+                    var game = MteBuildShowcaseGame(e, pairing, day, reservations, seasonId);
+                    _games.Add((e, pairing, new PlayedSeasonGame(
+                        game, firstOrdinal + _games.Count,
+                        e.Tier, e.EventId, pairing.GameIndex,
+                        pairing.SeatA, pairing.SeatB)));
+                }
             }
+            _results = new ShowcaseResult?[_games.Count];
+        }
 
+        public override string Name => "the showcases";
+        public override int Count => _games.Count;
+        public override int Ordinal(int local) => _games[local].Played.FixtureOrdinal;
+        public override DateOnly? Date(int local) => _games[local].Played.Game.Date;
+        public override PlayedSeasonGame Release(int local) => _games[local].Played;
+
+        public override void Finish(int local, PlayedSeasonGame played, int homeScore, int awayScore)
+        {
+            var (e, pairing, _) = _games[local];
+            _results[local] = new ShowcaseResult(
+                e.EventId, pairing.GameIndex, pairing.SeatA, pairing.SeatB,
+                pairing.SchoolAId, pairing.SchoolBId, homeScore, awayScore);
+        }
+
+        public override void AssertComplete()
+        {
+            var missing = Array.FindIndex(_results, r => r is null);
+            if (missing >= 0)
+                throw new InvalidOperationException(
+                    $"SHOWCASE: game {missing.ToString(CultureInfo.InvariantCulture)} of {_games.Count.ToString(CultureInfo.InvariantCulture)} never played.");
+        }
+
+        /// <summary>What the showcases did, in canonical order (event, then pairing) — the order
+        /// the S104 walk produced it in.</summary>
+        public ShowcasePlayOutcome Outcome()
+        {
+            var seatsPlayed = new Dictionary<int, IReadOnlyDictionary<int, int>>();
             // ★ THE WHOLE FIELD, not just the four who happened to appear in a pairing — the
             //   record's round-trip compares this map against the seats on disk as a whole,
             //   so a swapped pair is caught as readily as a missing school.
-            seatsPlayed[e.EventId] = e.Seats.ToDictionary(s => s.Seat, s => s.SchoolId);
+            foreach (var e in _events)
+                seatsPlayed[e.EventId] = e.Seats.ToDictionary(s => s.Seat, s => s.SchoolId);
+            return new ShowcasePlayOutcome(_results.Select(r => r!).ToList(), seatsPlayed, _games.Count);
         }
-
-        return new ShowcasePlayOutcome(results, seatsPlayed, ordinal);
     }
 
     /// <summary>★ EVERY SHOWCASE GAME IS AN ORDINARY <c>SeasonGame</c>, BUILT IN ONE PLACE —

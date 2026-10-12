@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 121** (2026-10-10; verified on Emmett's machine — the full suite, **97 timed sections,
+Last updated: **Session 122** (2026-10-11; verified on Emmett's machine — the full suite, **98 timed sections,
+820.5s, `ALL CHECKS PASSED.`**; Phase 113 new, 38 assertions, every predicted number landed). **THE SEASON ON THE
+CALENDAR** (★ **C-67**, Emmett 2026-10-10: *"a calendar needs to be the background organization that runs the whole
+game"*): every game is played on its day, one day at a time from November 1 to the championship Monday, each day's
+games in ordinal order — the November tournaments and buy games no longer play after March. **No game moved**: each
+game keeps its fixture ordinal and its seeds; season one's every game, its event record and the career file are the
+S121 build's, and the same career played on the calendar and in the old order writes every file byte for byte.
+Conference tournaments are seeded the morning they open, from their own league's games. A new career page, `day`,
+prints every game of a date. Journal S122 has the detail.)
+
+Previous: **Session 121** (2026-10-10; verified on Emmett's machine — the full suite, **97 timed sections,
 740.9s, `ALL CHECKS PASSED.`**; Phase 112 new, 39 assertions, every predicted number landed). **THE OFFSEASON CAMP**
 (O-73 partly shipped, ★ **C-66**, Emmett 2026-10-10: *"If a guy has very high potential in shooting and every year I
 prioritize that in camp, he could just keep getting better"*): every player arrives with a hidden potential (a tier per
@@ -598,6 +608,13 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S122 MOVED NO GAME.** Every fingerprint and pinned result stays at the S120 capture (Phases 102–104, Phase 113 C6b);
+season one's game blocks, its event record and a two-season career file are pinned from the S121 build (Phase 113 C2);
+every season two is unmoved too (C2d: calendar against old order, byte for byte). What changed is the order games are
+played in: by date, then ordinal (`PlayOrder`). The season page's floating calibration totals may differ in their last
+printed digit (they add up in calendar order); nothing asserts them. Stock season one on the calendar: 117 days with
+games, November 2 to March 19; busiest February 13 (152).
+
 **S121 MOVED NO SEASON-ONE GAME.** Every fingerprint and pinned result stays at the S120 capture (Phase 112 C6a,
 Phases 102–104 green). Every season two onward — a career's, and the `seasons` command's — now plays camped returners;
 nothing pins a season-two value. Stock season two (seeds 20260720 → 20260721): camps bad 683 / normal 1,633 / good 750 /
@@ -782,6 +799,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S122 — THE SEASON ON THE CALENDAR (C-67).** `Program.Season.Calendar.cs` (new): `SeasonPlayCalendar`, the day
+  loop from `FirstLegalDay` to `LastLegalDay` (empty days included), each day's games in ordinal order, refusing by name
+  a duplicate or missing ordinal, an undated game, a game outside the season, a later round on or before its feeder's
+  day, a school twice on one day, a game never played; `SeasonGameSource` / `SeasonStaticSource`. The four walkers
+  became sources: `MteBracketSource`, `MteShowcaseSource`, `ConfTourneySource` (seeded the morning it opens by the new
+  `ConfTourneyLeagueRecords`, from its own league's games), `BuyGameSource`. `RunSeasonCore`: per-game outputs written
+  to ordinal slots, `PlayOrder` / `FirstLegalDay` / `LastLegalDay` on the outcome, log blocks held and appended in
+  ordinal order (the log unchanged on disk), monthly progress lines. `Program.DayPage.cs` (new): `day <world>
+  <YYYY-MM-DD> --history <career>`. Phase 113 new (38); Phase 89's header and C4b and Phase 101 C6d re-worded (the
+  numbers say last, the dates say November, play follows the dates); registry 98. Journal S122.
 - **★ S121 — THE OFFSEASON CAMP (O-73 partly; C-66).** `DevelopmentConfig` (new; 42 dials, aggregated validation,
   `AttributeOrder` a key, K1's groups in code). `Program.Development.cs` (new): the K5 per-person streams (potential
   from the arrival season seed and arrival pool index, its first draw the development seed; camp from that seed and the
@@ -1389,8 +1416,24 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-126 — WEEKLY IN-SEASON PRACTICE (S121, ruled for S122).** Small weekly bumps during the season, on top of the
-  summer camp. The next session by Emmett's plan; its own design conversation for the numbers.
+- **O-133 — THE CALENDAR RUNS THE YEAR (S122, C-67).** The calendar extends past the season to July 1 → June 30:
+  offseason events on their dates — early April the season ends and seniors leave; April–May the transfer portal and
+  spring signing; June–July freshmen arrive and the summer camp; July 1 the new basketball year; October preseason
+  practice. Today the turnover and the camp run as one step at the top of the next season. **Next, by Emmett's order of
+  work**, together with O-134.
+- **O-134 — SAVE ANYWHERE, RELOAD ANYWHERE, AND THE SIM BUTTONS (S122, C-67).** *"'sim day', 'sim week', 'sim month',
+  'sim to next game/event'"*; *"close and save the game at any point of the season/offseason and … reload the save game
+  where they left off."* The save redesign — **includes the log written in play order**, as each game plays (S122 holds
+  blocks and appends them in ordinal order after the season, K2), and a season that can stop and resume mid-calendar.
+- **O-132 — FRESH DICE ON EVERY LIVE SIM; FIXED SEEDS FOR THE SUITE (S122).** *"If i sim a game 10,000 times i should
+  get 10,000 unique results right?"* — yes; and the camp ruling, *"if you save scummed 10 times you should get 10
+  slightly different results."* Today every game's seeds come from its season seed and fixture ordinal. The live game
+  draws fresh; the suite keeps fixed seeds. Belongs to the save session (O-134).
+- **O-135 — RECRUITING THROUGH THE YEAR (S122, C-67).** Recruiting happens during many of the year's phases (Emmett, on
+  the approved year). After O-133, O-134 and O-126.
+- **O-126 — WEEKLY IN-SEASON PRACTICE (S121; re-sequenced at S122).** Small weekly bumps during the season, on top of the
+  summer camp. **After O-133 and O-134** by Emmett's order of work (C-67): practice runs October–March on the calendar,
+  which the calendar session builds. Its own design conversation for the numbers.
 - **O-127 — COACH STYLE SETS THE CAMP (S121).** *"Certain coaches might prioritize certain things heavier"* and the
   widening/rotation was ruled *"probably a coaching attribute later."* Today every camp is the computer's
   (`PrioritySplits`, `RepeatAfter`, `RepeatFactor`, the K9 tie-break). Waits on coaches existing (O-57).
@@ -1747,7 +1790,7 @@ chart is PROVISIONAL pending O-6.
   scouting file. **The generator's ceiling stays discarded, by ruling** — its runway points the wrong way for this design
   (median runway 18–29 in a man's best skill, 2–5 in the rest), so potential is rolled fresh on arrival; the latent
   card, runway and arrival remain out of the archive (S90) and out of the scouting file. **What remains of the arc is
-  boarded on its own lines:** weekly practice (O-126, S122), coach style (O-127), your own players' camps (O-128),
+  boarded on its own lines:** weekly practice (O-126, after the calendar sessions O-133/O-134), coach style (O-127), your own players' camps (O-128),
   labels after growth (O-129), leaving early (O-130), Weight in the game (O-131). Two facts still worth not
   re-deriving: `CurrentSkills` is fully redundant with the stored 38, and `Runway` is exactly `Latent − Current`.
 - **~~O-68~~ — RESOLVED WRONG AND REPLACED (S89.1).** S89 recorded S88 as "a dial set with no code".
@@ -2321,6 +2364,19 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-67 (S122, Emmett, 2026-10-10) — THE CALENDAR RUNS THE GAME.** *"The game needs to be in calendar order, and in
+  general a calendar needs to be the background organization that runs the whole game. It should be July 8, 1987 or
+  whatever and offseason recruiting, or whatever ends up going on then, is happening."* **The year**, approved as
+  *"about right with recruiting happening during many of those phases"*: early April the season ends and seniors leave;
+  April–May the transfer portal and spring signing; June–July freshmen arrive and the summer camp; July 1 the new
+  basketball year; October preseason practice; early November the first games, early tournaments and buy games; January
+  to early March conference play; March conference tournaments, Selection Sunday and the NCAA tournament; October–March
+  weekly practice. **The sim buttons**: sim day, sim week, sim month, sim to next game or event; **save anywhere, reload
+  anywhere**. **The order of work**: (1) the season on the calendar (S122 ✅); (2) the calendar runs the year, with save
+  and reload and the sim buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135).
+  **The day page**: *"a list of every game … all the way down"*, the score once played, "vs." on a neutral floor
+  (*"Yes that looks right"*). Do not "fix" a game's fixture ordinal into calendar order — the ordinal is its seed;
+  play order follows the date, numbering does not.
 - **C-66 (S121, Emmett, 2026-10-10) — THE OFFSEASON CAMP.** Everything grows, at different speeds: skills a lot,
   strength and weight can jump, athleticism slowly and never slips, height in small scattered spurts. IQ and Discipline
   grow by age and minutes and stay near where a man arrived (*"No player is going to go from the 10th to 90th percentile
@@ -2685,6 +2741,17 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE SEASON ON THE CALENDAR — S122 (2026-10-11). NEXT: THE CALENDAR RUNS THE YEAR (O-133), WITH SAVE ANYWHERE,
+RELOAD ANYWHERE AND THE SIM BUTTONS (O-134; fresh dice, O-132)**, by Emmett's order of work (C-67); drafted at the
+next-prompt pass (CONVENTIONS §6). Then weekly practice (O-126), then recruiting through the year (O-135). **O-120** and
+**O-121** sit beside it. **Carry into the draft:** the log is still written in fixture order (S122 K2), so the save
+redesign breaks its format once — bump the version and retire the old reader in the same session (C-60). Every game's
+ordinal is still its seed; fresh live dice (O-132) must leave the suite's fixed seeds reachable, or every pin in the
+suite goes with them. Season sources already exist (`SeasonGameSource`), so a season that stops mid-calendar needs its
+sources' state saved — a bracket's occupancy, a tournament's seeded field. **Carry into any new check file:** a
+`Program.Checks.<Name>.cs` may already exist (S122 first wrote Phase 113 over Phase 82's `Program.Checks.Calendar.cs`
+and caught it at compile) — list the folder before naming one.
 
 ★ **THE OFFSEASON CAMP — S121 (2026-10-10). NEXT: S122, WEEKLY IN-SEASON PRACTICE (O-126)**, by Emmett's plan at the
 S121 design conversation; drafted at the next-prompt pass (CONVENTIONS §6). **O-120** and **O-121** sit beside it.

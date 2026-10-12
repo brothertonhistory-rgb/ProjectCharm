@@ -116,32 +116,57 @@ internal static partial class Program
         return plans;
     }
 
-    /// <summary>★ S111 — plays every plan once, in order, at ordinals starting at
-    /// <paramref name="firstOrdinal"/>. Ids come from the commit's own block, position for
-    /// position; legacy mode (no season) leaves them absent, exactly as every other fixture.</summary>
-    private static BuySeasonResult BuyPlaySeason(
-        IReadOnlyList<BuyGamePlan> plans, IReadOnlyList<GameId> reserved, SeasonId? seasonId,
-        int firstOrdinal, Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play)
+    /// <summary>★ S111 / S122 — every dated plan as a calendar source, at ordinals starting at
+    /// <paramref name="firstOrdinal"/> in the dater's pairing order (the S111 numbering, so every buy
+    /// game keeps its engine seed). Ids come from the commit's own block, position for position;
+    /// legacy mode (no season) leaves them absent, exactly as every other fixture. The day loop plays
+    /// each on its date; the rows come back in pairing order from <c>Outcome</c>.</summary>
+    private sealed class BuyGameSource : SeasonGameSource
     {
-        if (seasonId is not null && reserved.Count != plans.Count)
-            throw new InvalidOperationException(
-                $"SEASON INVARIANT VIOLATED: {plans.Count} non-conference games but {reserved.Count} " +
-                "reserved ids.");
+        private readonly List<(int PairIndex, PlayedSeasonGame Played)> _games = new();
+        private readonly BuyGameRow?[] _rows;
 
-        var rows = new List<BuyGameRow>(plans.Count);
-        for (var i = 0; i < plans.Count; i++)
+        public BuyGameSource(IReadOnlyList<BuyGamePlan> plans, IReadOnlyList<GameId> reserved,
+                             SeasonId? seasonId, int firstOrdinal)
         {
-            var plan = plans[i];
-            var game = seasonId is null
-                ? plan.Game
-                : plan.Game with { SeasonId = seasonId, GameId = reserved[i] };
-            var ordinal = firstOrdinal + i;
-            var (home, away) = play(new PlayedSeasonGame(game, ordinal, BuyPairIndex: plan.PairIndex));
-            var winner = home > away ? game.HomeId : away > home ? game.AwayId : 0;
-            rows.Add(new BuyGameRow(plan.PairIndex, game.Date!.Value, game.HasHost, game.PlaceId,
-                                    game.HomeId, game.AwayId, winner, ordinal));
+            if (seasonId is not null && reserved.Count != plans.Count)
+                throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED: {plans.Count} non-conference games but {reserved.Count} " +
+                    "reserved ids.");
+            for (var i = 0; i < plans.Count; i++)
+            {
+                var plan = plans[i];
+                var game = seasonId is null
+                    ? plan.Game
+                    : plan.Game with { SeasonId = seasonId, GameId = reserved[i] };
+                _games.Add((plan.PairIndex, new PlayedSeasonGame(game, firstOrdinal + i, BuyPairIndex: plan.PairIndex)));
+            }
+            _rows = new BuyGameRow?[_games.Count];
         }
-        return new BuySeasonResult(plans.Count, rows);
+
+        public override string Name => "the buy games";
+        public override int Count => _games.Count;
+        public override int Ordinal(int local) => _games[local].Played.FixtureOrdinal;
+        public override DateOnly? Date(int local) => _games[local].Played.Game.Date;
+        public override PlayedSeasonGame Release(int local) => _games[local].Played;
+
+        public override void Finish(int local, PlayedSeasonGame played, int home, int away)
+        {
+            var game = played.Game;
+            var winner = home > away ? game.HomeId : away > home ? game.AwayId : 0;
+            _rows[local] = new BuyGameRow(_games[local].PairIndex, game.Date!.Value, game.HasHost, game.PlaceId,
+                                          game.HomeId, game.AwayId, winner, played.FixtureOrdinal);
+        }
+
+        public override void AssertComplete()
+        {
+            var missing = Array.FindIndex(_rows, r => r is null);
+            if (missing >= 0)
+                throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED: buy game {missing} of {_games.Count} never played.");
+        }
+
+        public BuySeasonResult Outcome() => new(_games.Count, _rows.Select(r => r!).ToList());
     }
 
     /// <summary>★ S111 — THE SEVENTH FINGERPRINT. One row per played buy game, sorted by
