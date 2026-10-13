@@ -10,7 +10,19 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 123** (2026-10-12; verified on Emmett's machine — the full suite, **99 timed sections,
+Last updated: **Session 124** (2026-10-12; verified on Emmett's machine — the full suite, **100 timed sections,
+2,320.3s, `ALL CHECKS PASSED.`**; Phase 115 new, 19 assertions, 88.0s; Phase 114 32, 134.7s; the suite ~984s slower than S123
+beyond the new phase — O-114, not yet split). **A SEASON LEAVES NO TRACE UNTIL IT
+CLOSES** (save design phase **B1a** — B1 split by Emmett, 2026-10-12, into B1a / B1b / B1c, C-68): a career season now
+writes nothing before its close, and the career file is written last. **An interrupted season no longer ends a career**:
+stopped while it plays, the career is exactly as it was and the next run plays the same season from November 1,
+identically; stopped while it closes, the career file still says the season never happened, and the next close sets the
+stray files aside in `career.orphans/` before writing fresh ones. **Nothing moved**: every log, scouting file, event
+record and the career file byte for byte, the season page line for line; only when they are written. A record that
+cannot be written now fails the close by name (S97's "hole in event history" retired). The career lock is held through
+play. Journal S124 has the detail.)
+
+Previous: **Session 123** (2026-10-12; verified on Emmett's machine — the full suite, **99 timed sections,
 1,248.5s, `ALL CHECKS PASSED.`**; Phase 114 new, 33 assertions, every predicted marker landed; the suite time missed —
 Phase 90, O-114). **THE SEASON THAT CAN STOP** (save design phase A, ★ **C-68**, Emmett 2026-10-11 — Q1: *"I'd hate
 to save my file on March 1st and have to close the program"*): a season is now set up, played through any day — a
@@ -617,6 +629,10 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S124 MOVED NO GAME AND NO FILE — ONLY WHEN THE FILES ARE WRITTEN.** Every fingerprint and pin stays where S122 left it
+(Phases 102–104, 113 green); the career file after season one is still `9c892e97…`, now written by the close. A career
+folder holds a `career.orphans/` folder only after a close that did not finish.
+
 **S123 MOVED NO GAME AND NO FILE.** Every fingerprint and pin stays where S122 left it (Phases 102–104, 113 green);
 Phase 114 re-proves the S121 pins and the S120 capture on a career played in random chunks. The season page is S122's
 line for line. `RunSeasonCore` is now a wrapper over `SeasonBegin` / `AdvanceThrough` / `Finish`.
@@ -812,6 +828,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S124 — A SEASON LEAVES NO TRACE UNTIL IT CLOSES (save design B1a, C-68).** `HistoryStore`: reservations held in
+  memory; `PublishReservations()` (the transitional v3 season-close publication); `CloseReservations()` keeps the lock,
+  `Dispose` releases it. `SeasonRun`: the set-up writes nothing; the close checks everything in memory, then writes the
+  set-aside, the log, the scouting file, the event record (once) and the career file, in that order — the publish the
+  last step that can fail. `MteFinalRecordBytes` (pure) and `MteWriteRecord`; `CareerSetAsideUnfinished` (the four
+  recognised kinds of this season or later to `career.orphans/`, byte-untouched; refuses the close by name if it cannot);
+  `SeasonRunOptions.CloseStepForTest`. Retired: `MtePublishRecord`, `MteRefuseExistingRecord`,
+  `MteReplaceRecordWithFinishes`, `EventRecordStatus.WriteFailed`, the record and finish diagnostics, the two page lines.
+  Phase 115 new (19); the ledger rows (Phases 80, 87, 88, 89, 114); registry 100. Journal S124.
 - **★ S123 — THE SEASON THAT CAN STOP (save design phase A, C-68).** `Program.Season.Run.cs` (new): `SeasonRunOptions`,
   `SeasonBegin`, `SeasonRun` — the set-up, the game (`PlayOneGame`) and the close moved verbatim, every value they read
   a field. `Program.Season.Calendar.cs`: `SeasonCalendarRun` — `NextDay` / `AdvanceThrough` / `IsComplete` / `Finish` /
@@ -1445,18 +1470,27 @@ chart is PROVISIONAL pending O-6.
 - **O-134 — SAVE ANYWHERE, RELOAD ANYWHERE, AND THE SIM BUTTONS (S122, C-67; re-scoped S123 to C-68's five phases).**
   *"'sim day', 'sim week', 'sim month', 'sim to next game/event'"*; *"close and save the game at any point of the
   season/offseason and … reload the save game where they left off."* **A** — the season that can stop ✅ S123. **B1** —
-  safe saves: **next**, once its ledger (brief §14a) is re-verified against the S123 build. **B2** — resuming
+  safe saves, split by Emmett (2026-10-12) into three: **B1a** — nothing is written until the season closes ✅ S124 (an
+  interrupted season no longer ends a career); **B1b** — the career file becomes trustworthy (v4 with its checksum and
+  file list, the backup and recovery, the rules record, the league-state file, older careers refused): **next**; **B1c**
+  — nothing reads a file the career does not list (the read boundary and quarantine for every reader; retires S124's
+  set-aside rule). **B2** — resuming
   mid-season: under Q1 a **snapshot** design (its schema, shared references restored, live source state, resources
   rebound), with re-play kept as the suite's oracle — a snapshot restored in a fresh process must finish identical to an
   uninterrupted season; the brief's re-play design of B2 is no longer authoritative. The log **written as games play**
   (Q5, ruled) is an **uncommitted working file until the season closes** — a file the current save lists is never
-  appended to — settled before B1 finalizes its transaction design. **B3** — fresh dice (O-132), autosave (Q2: day,
+  appended to — settled before B1b finalizes its transaction design. **B3** — fresh dice (O-132), autosave (Q2: day,
   week, two weeks or month; weekly by default), the sim commands. **C** — prestige read from the league state.
 - **O-132 — FRESH DICE ON EVERY LIVE SIM; FIXED SEEDS FOR THE SUITE (S122).** *"If i sim a game 10,000 times i should
   get 10,000 unique results right?"* — yes; and the camp ruling, *"if you save scummed 10 times you should get 10
   slightly different results."* Today every game's seeds come from its season seed and fixture ordinal. The live game
   draws fresh; the suite keeps fixed seeds. **In B3 (O-134), ruled Q4 (C-68):** a game already played never changes;
   the days after a save re-roll on every load; the suite keeps fixed dice.
+- **O-136 — A SCOUTING FILE THAT CANNOT BE WRITTEN CRASHES THE `season` COMMAND (S124).** A disk failure writing the
+  scouting file escapes as a raw error and a non-zero exit instead of a `SEASON ERROR` line (its error kind is not one the
+  command catches; the same holds for a damaged last-season scouting file at step 1). True before S124 too, when it was
+  written at the set-up. Nothing is published either way, so the career is safe — the season plays again next run. A
+  one-line catch in the `season` command; natural in B1b, which touches the same refusals.
 - **O-135 — RECRUITING THROUGH THE YEAR (S122, C-67).** Recruiting happens during many of the year's phases (Emmett, on
   the approved year). After O-133, O-134 and O-126.
 - **O-126 — WEEKLY IN-SEASON PRACTICE (S121; re-sequenced at S122).** Small weekly bumps during the season, on top of the
@@ -1542,7 +1576,8 @@ chart is PROVISIONAL pending O-6.
   one more check, and the sandbox 938.9s — the spread now runs both ways; fifth at S116: Phase 105 168.2s and 138.7s on
   two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite;
   sixth at S123: Phase 90 110.8s against 36.3s at S122, the rest ~7% slower, suite 1,248.5s — split in the sandbox on
-  both builds, Phase 90 77.0s on S122 and 68.9s on S123, so not the code).** Phase 103 ran **93.5s** on Emmett's machine against
+  both builds, Phase 90 77.0s on S122 and 68.9s on S123, so not the code; seventh at S124: suite 2,320.3s against
+  1,248.5s, of which the new Phase 115 is 88.0s — not yet split).** Phase 103 ran **93.5s** on Emmett's machine against
   17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
   of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
   wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
@@ -2395,7 +2430,10 @@ chart is PROVISIONAL pending O-6.
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
 - **C-68 (S123, Emmett, 2026-10-11) — THE SAVE DESIGN.** Five phases: A, the season that can stop (S123 ✅); B1, safe
-  saves; B2, resuming mid-season; B3, fresh dice, autosave and the sim commands; C, prestige read from the league state.
+  saves — **split by Emmett at the S123 next-prompt pass (2026-10-12) into B1a, nothing written until the season closes
+  (S124 ✅); B1b, the career file becomes trustworthy; B1c, nothing reads a file the career does not list**, because B1 as
+  written bundled a new career-file format, the read boundary, crash recovery and about fifteen rewritten checks into
+  one session; B2, resuming mid-season; B3, fresh dice, autosave and the sim commands; C, prestige read from the league state.
   **Q1 store everything** — a mid-season save holds the season's whole live state, so loading is fast; re-play only in
   the suite, to prove a loaded save finishes as an uninterrupted season does (*"When we get a full suite of D1, D2, D3,
   JUCO, Etc... that's a lot of stuff to replay. I'd hate to save my file on March 1st and have to close the program"*).
@@ -2784,10 +2822,24 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
+★ **A SEASON LEAVES NO TRACE UNTIL IT CLOSES — S124 (2026-10-12). NEXT: B1b, THE CAREER FILE BECOMES TRUSTWORTHY
+(O-134, C-68)** — v4 with its checksum and file list, the backup and recovery, the rules record, the league-state file,
+older careers refused; drafted at the next-prompt pass (CONVENTIONS §6), its ledger re-verified against the S124 build
+(brief §14a — the rows B1a settled are marked there). **Carry into the draft:** (1) `PublishReservations()` is S124's
+transitional publication; B1b's manifest swap replaces it, and must keep the commit boundary S124 proved — the publish
+the last fallible step, the outcome built before the first write (Phase 115 C2, C5). (2) The set-aside (`career.orphans/`)
+infers ownership from names and the counters; it is B1c's to retire, so B1b's file list should be the thing B1c reads.
+(3) **The career lock is now held through play**, so a career's pages refuse while its season plays in another window;
+if B1b's design wants pages to read a career mid-season, that is a decision, not a side effect. (4) **The `season`
+command exits 0 when it prints `SEASON ERROR`** — any check that runs it as a child judges the output and the files,
+never the exit code (Phase 115's verdict and its control). (5) O-136, if the refusals are touched anyway. (6) Phase 115's
+fresh-process child (the running harness relaunched, through the `dotnet` host when that is what runs it) is reusable
+for B2's proof.
+
 ★ **THE SEASON THAT CAN STOP — S123 (2026-10-12). NEXT: B1, SAFE SAVES (O-134, C-68)**, once its ledger (brief §14a) is
-re-verified against the S123 build; drafted at the next-prompt pass (CONVENTIONS §6). **Carry into the draft:** (1) **the
-brief in the tree is r1, not r3.1** — `99ddbd7`'s message says r3.1, but the committed file is titled r1, recommends
-re-play for Q1 and has no §14; the draft starts from r3.1, which must be put in `docs/` first. (2) Q5 against the
+re-verified against the S123 build; drafted at the next-prompt pass (CONVENTIONS §6). **Carry into the draft:** (1) the
+brief: `99ddbd7` committed r1 under an r3.1 message; **fixed by the S123 follow-up `9928e9a`, which put r3.1 in
+`docs/`**. (2) Q5 against the
 authority rule is settled before B1's transaction design: the live log is an uncommitted working file until close.
 (3) **Anything run on Windows that reads a file a live writer holds must open it allowing writers**, and no check
 writes to a live file — the S123 gate found both in the prompt, sandbox-green and Windows-red. (4) **A file carrying

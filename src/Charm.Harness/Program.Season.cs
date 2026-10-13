@@ -1371,8 +1371,9 @@ internal static partial class Program
     /// <summary>★ S89 — the schedule is built identity-free FIRST, validated, and only then
     /// numbered. The order matters: a schedule that fails to build must not have already
     /// spent a season number on itself, and no half-validated fixture may ever become
-    /// visible carrying an identity. Once the numbers ARE reserved they are durable, so a
-    /// season that then fails burns them permanently — a gap, never a retry.
+    /// visible carrying an identity. ★ S124 — the numbers are held in memory until the
+    /// season closes; a season that fails before its close spends nothing, and is played
+    /// again with the same numbers.
     ///
     /// <para>★ S93 — <paramref name="seasonSeed"/> no longer reaches the schedule at all. It
     /// stays in the signature because it names the season everywhere else and because the
@@ -1509,10 +1510,10 @@ internal static partial class Program
         return games;
     }
 
-    /// <summary>★ S97 — THE COMMIT. After this returns, the season id is spent whatever
-    /// happens next: the reservation is durable and a season that then fails burns it
-    /// permanently. That is S89's rule unchanged; all this session did was move the moment
-    /// later, so that everything capable of refusing a season now runs before it.
+    /// <summary>★ S97 — THE NUMBERING. ★ S124 — no longer the commit: the numbers taken here
+    /// are held in the career store's memory and published only as the LAST write of the
+    /// season's close (B1a). A season that fails before that spends nothing; the next run
+    /// takes the same numbers in the same order.
     ///
     /// <para>One season number and one contiguous block of game numbers, reserved together
     /// and stamped in schedule order.</para></summary>
@@ -1530,8 +1531,8 @@ internal static partial class Program
 
     /// <summary>★ S98 — THE TOURNAMENT GAME NUMBERS ARE TAKEN HERE, AND THIS IS FORCED RATHER
     /// THAN PREFERRED. <c>CloseReservations()</c> runs before the first tip, so nothing can
-    /// reserve an id once play begins; every tournament id must therefore be spent at this
-    /// commit, alongside the conference block.
+    /// reserve an id once play begins; every tournament id must therefore be taken here,
+    /// alongside the conference block.
     ///
     /// <para>The pairings are unknown at this moment. The COUNT is not: twelve per active
     /// complete eight-team field, four per active complete four-team field, and ZERO for a

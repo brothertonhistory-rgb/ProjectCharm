@@ -70,10 +70,14 @@ internal static partial class Program
                     // "Discard" five: they are simply dropped. Nothing tells the allocator,
                     // and that is the design — there is no retirement API to tell it with.
                     second = h.ReservePersons(4);
+                    h.PublishReservations();   // ★ S124 — numbers are held until published (a season's close)
                 }
                 // Persist -> reload -> issue again. Numbering continues; it never restarts.
                 using (var h2 = HistoryStore.Open(p, tinyFp))
+                {
                     third = h2.ReservePersons(3);
+                    h2.PublishReservations();
+                }
 
                 var all = first.Concat(second).Concat(third).ToList();
                 Check("B1 non-reuse: 17 identities issued across three batches and one reload, "
@@ -87,6 +91,25 @@ internal static partial class Program
                       + "or game issuance)",
                       state.NextSeasonId == 1 && state.NextGameId == 1,
                       $"season {state.NextSeasonId}, game {state.NextGameId}");
+
+                // ★ S124 (B1a, K1) — a reservation that was never published was never issued. Reserve
+                //   five, dispose WITHOUT publishing, reopen: the same five numbers are handed out again
+                //   and the stored counter never moved. This is what lets an interrupted season be
+                //   played again with its own numbers.
+                var before = File.ReadAllBytes(p);
+                PersonId[] held, again;
+                using (var h3 = HistoryStore.Open(p, tinyFp))
+                    held = h3.ReservePersons(5);
+                var afterHeld = File.ReadAllBytes(p);
+                using (var h4 = HistoryStore.Open(p, tinyFp))
+                    again = h4.ReservePersons(5);
+                Check("B1 ★ S124 — an unpublished reservation is handed out again after a reload, number for number",
+                      held.SequenceEqual(again) && held.Intersect(all).Count() == 0,
+                      $"{string.Join(",", held.Select(x => x.ToString()))}");
+                Check("B1 ★ S124 — and the stored next-person never moved (the career file is byte-identical)",
+                      before.AsSpan().SequenceEqual(afterHeld) && before.AsSpan().SequenceEqual(File.ReadAllBytes(p))
+                      && PeekState(p).NextPersonId == 18,
+                      $"nextPersonId {PeekState(p).NextPersonId}");
             }
 
             // ── B2 — ★ no domain inference, enforced by the TYPE SURFACE. ────────────
@@ -173,6 +196,7 @@ internal static partial class Program
                 {
                     using var h = HistoryStore.Open(path, tinyFp);
                     var res = RunDivvyDraft(tiny, seed, h);
+                    h.PublishReservations();   // ★ S124 — held until published, so the files below can advance
                     return res.PersonIds!.Keys.ToDictionary(k => k, k => res.PersonIds![k]);
                 }
                 var mapA = Run(a);
@@ -182,7 +206,7 @@ internal static partial class Program
                       mapA.Count == mapB.Count && mapA.All(kv => mapB[kv.Key] == kv.Value),
                       $"{mapA.Count} entries");
                 Check("B3 both files advanced to the same next-person",
-                      PeekState(a).NextPersonId == PeekState(b).NextPersonId,
+                      PeekState(a).NextPersonId == PeekState(b).NextPersonId && PeekState(a).NextPersonId > 1,
                       $"{PeekState(a).NextPersonId}");
             }
 

@@ -138,6 +138,9 @@ internal static partial class Program
                 store.ReserveSeason();      // season 1 spent, no log published
                 CheckState("C2c: a season number spent with no log — attempt named, no problem",
                            ReadHostMemory(store), HostMemoryStatus.NoPublishedLog, null, 1, HostMemoryProblem.None);
+                // ★ S124 — numbers are held until published; C2d and C2e reopen this career and need
+                //   season 1 to have happened, so the hand-spent number is published as a close would.
+                store.PublishReservations();
             }
 
             // Two different kinds of bad candidate, kept apart on purpose — they are not the

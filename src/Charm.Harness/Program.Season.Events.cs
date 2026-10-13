@@ -331,23 +331,24 @@ internal static partial class Program
     }
 
     /// <summary>What happened to the permanent record. <c>NotApplicable</c> is legacy mode —
-    /// no career, so there is nothing for a record to be about.</summary>
-    private enum EventRecordStatus { NotApplicable, Written, WriteFailed }
+    /// no career, so there is nothing for a record to be about.
+    /// <para>★ S124 (K5) — there is no <c>WriteFailed</c>. The record is written at the close,
+    /// before the career file; a record that cannot be written fails the close, nothing is
+    /// published, and the season is played again next run. A season that returns an outcome
+    /// wrote its record.</para></summary>
+    private enum EventRecordStatus { NotApplicable, Written }
 
-    /// <summary>★ S98 — <c>FinishStatus</c> is the SECOND write of the season and it is a
-    /// different event from the first. S97's <c>RecordStatus</c> says whether the NotPlayed
-    /// record was published at the commit; this says whether the finishes were later written
-    /// over it. A failure here leaves a season that was validly played and a year of event
-    /// history that cannot say who won — the same deliberate hole S97 already models, and
-    /// there is no retry inside the run.</summary>
+    /// <summary>★ S98 — <c>RecordStatus</c> says whether this career season has a record;
+    /// <c>FinishStatus</c> says whether any event played, so the record carries its finishes.
+    /// ★ S124 — both are decided before the close writes anything, and the record is written
+    /// ONCE, finishes included (there is no NotPlayed file to replace any more).</summary>
     private sealed record EventSeasonOutcome(
         EventSeatingOutcome Seating, EventRecordStatus RecordStatus,
-        string? RecordDiagnostic, IReadOnlyList<string> HistoryDiagnostics,
-        EventRecordStatus FinishStatus = EventRecordStatus.NotApplicable,
-        string? FinishDiagnostic = null)
+        IReadOnlyList<string> HistoryDiagnostics,
+        EventRecordStatus FinishStatus = EventRecordStatus.NotApplicable)
     {
         public static readonly EventSeasonOutcome None = new(
-            EventSeatingOutcome.Empty, EventRecordStatus.NotApplicable, null, Array.Empty<string>());
+            EventSeatingOutcome.Empty, EventRecordStatus.NotApplicable, Array.Empty<string>());
     }
 
     // ── What the last four seasons say ───────────────────────────────────────────
@@ -820,53 +821,144 @@ internal static partial class Program
         return result;
     }
 
-    /// <summary>★ The collision precheck, run BEFORE the season number is spent. A permanent
-    /// record is never silently overwritten, and a season id is never burned beside a file
-    /// this run did not produce — a stale record left standing is worse than a hole, because
-    /// next season would read its fields as history that never happened.</summary>
-    private static void MteRefuseExistingRecord(HistoryStore? history, long pendingSeasonId)
-    {
-        if (history is null) return;
-        var path = MteRecordPathFor(history.Path, pendingSeasonId);
-        if (File.Exists(path))
-            throw new InvalidOperationException(
-                $"SEASON EVENT RECORD COLLISION: '{path}' already exists for the season about to be " +
-                "scheduled. Nothing has been reserved and nothing has been written. A permanent event " +
-                "record is never overwritten — move or delete that file if the season is genuinely to " +
-                "be replayed.");
-    }
+    // ── S124: the record is written ONCE, at the close (K3) ───────────────────────
+    //
+    //  ★ Until S124 the NotPlayed record was published at the set-up and replaced with its
+    //  finishes at the close, so a season stopped in between left a record behind and the
+    //  next run refused (S97's collision precheck). Now the set-up builds the NotPlayed body
+    //  in memory (MteRecordBytes, the exact bytes it used to write) and the close writes the
+    //  final record once — finishes included when any event played — before the career file.
+    //  A stale record for the pending season is SET ASIDE by the close (CareerSetAsideUnfinished),
+    //  never refused and never overwritten.
 
-    /// <summary>Publish the season's record atomically and WITHOUT overwriting. The precheck
-    /// above gives the actionable early refusal; this is the guard against the impossible
-    /// late collision, and it fails loudly as an invariant violation rather than being
-    /// classified as an ordinary write failure.</summary>
-    private static void MtePublishRecord(
-        HistoryStore history, long seasonId, long seasonSeed,
-        WorldFile world, EventSeatingOutcome seating,
-        IReadOnlyList<LiveContract> survivingContracts,
-        IReadOnlyList<NonConPairingEntry> nonConferencePairings)
+    /// <summary>★ S124 — publish a season's record atomically and WITHOUT overwriting: a whole
+    /// temp file, then one no-overwrite move. <paramref name="publish"/> is the injected seam
+    /// Phase 89 forces a failure through (S98's reason, unchanged: a forced failure must prove
+    /// something about this method, not about the filesystem). Any failure is refused by name,
+    /// as an <see cref="InvalidOperationException"/> the <c>season</c> command prints, and leaves
+    /// no final file and no temp file.</summary>
+    private static void MteWriteRecord(
+        string historyPath, long seasonId, byte[] bytes, Action<string, string>? publish = null)
     {
-        var folder = MteRecordFolderFor(history.Path);
-        Directory.CreateDirectory(folder);
-        var final = MteRecordPathFor(history.Path, seasonId);
+        var folder = MteRecordFolderFor(historyPath);
+        var final = MteRecordPathFor(historyPath, seasonId);
         var temp = Path.Combine(folder, $".charm-events-{Guid.NewGuid():N}.tmp");
-
-        var bytes = MteRecordBytes(history, seasonId, seasonSeed, world, seating,
-                                   survivingContracts, nonConferencePairings);
-        File.WriteAllBytes(temp, bytes);
         try
         {
-            // overwrite:false — File.Move throws if the destination exists, which is exactly
-            // the no-overwrite atomic publication this needs.
-            File.Move(temp, final, overwrite: false);
+            Directory.CreateDirectory(folder);
+            File.WriteAllBytes(temp, bytes);
+            (publish ?? MteDefaultPublish)(temp, final);
         }
-        catch (IOException) when (File.Exists(final))
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            try { File.Delete(temp); } catch (IOException) { /* best effort */ }
+            try { if (File.Exists(temp)) File.Delete(temp); } catch (Exception) { /* best effort */ }
             throw new InvalidOperationException(
-                $"SEASON EVENT RECORD INVARIANT VIOLATED: '{final}' appeared between the collision " +
-                "precheck and publication. The season id has been spent and no record was written.");
+                $"SEASON EVENT RECORD NOT WRITTEN: '{final}' — {ex.Message} Nothing was published; " +
+                "the career is still at its last finished season and this one is played again next run.", ex);
         }
+    }
+
+    /// <summary>The real publication. overwrite:false — the move throws if the destination
+    /// exists, which cannot happen after the close's set-aside unless something wrote it since.</summary>
+    private static void MteDefaultPublish(string temp, string final)
+        => File.Move(temp, final, overwrite: false);
+
+    // ── S124 (K4): an unfinished season's files, set aside ───────────────────────
+    //
+    //  ★ A TEMPORARY v3 RECOVERY RULE. The career file is published LAST and one writer holds
+    //  the lock, so a file belonging to a season at or past the pending one can only have been
+    //  written by a close that did not finish (or placed by hand). No reader opens such a file:
+    //  every reader computes the path of an EARLIER season. So the close's first step moves
+    //  every such file into `career.orphans/`, keeping its relative path, before it writes.
+    //
+    //  Two invariants, which carry into B1c (where the career's own file list replaces this
+    //  inference from names and counters):
+    //    • a set-aside file is NEVER deleted or changed — moved within the career's folder, so
+    //      a rename, byte for byte;
+    //    • only the four recognised kinds are moved: `career.events/season-N.json`, and
+    //      `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`. Lock
+    //      sidecars (reused by design, S90), temp files and anything else stay exactly where
+    //      they are.
+    //
+    //  A file that cannot be moved refuses the close by name. Nothing has been published at
+    //  that point, so the career stays at its last finished season.
+
+    private static readonly string[] CareerSeasonFileSuffixesInLogFolder = { ".log", ".log.inprogress", ".scout" };
+
+    /// <summary>The folder a career's set-aside files go to — named for the history FILE, exactly
+    /// as the event-record and game-log folders are.</summary>
+    private static string CareerOrphansFolderFor(string historyPath)
+    {
+        var full = Path.GetFullPath(historyPath);
+        if (full.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) full = full[..^5];
+        return full + ".orphans";
+    }
+
+    /// <summary>The season a recognised file name belongs to, or null. Canonical only: "season-",
+    /// then a positive decimal with no sign and no leading zero, then exactly one recognised
+    /// suffix. A name the game would never write is not recognised, and so never moved.</summary>
+    private static long? CareerSeasonOfFileName(string name, IReadOnlyList<string> suffixes)
+    {
+        const string prefix = "season-";
+        if (!name.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        foreach (var suffix in suffixes)
+        {
+            if (!name.EndsWith(suffix, StringComparison.Ordinal)) continue;
+            var digits = name[prefix.Length..^suffix.Length];
+            if (digits.Length == 0 || digits[0] == '0' || !digits.All(char.IsAsciiDigit)) continue;
+            if (long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var season))
+                return season;
+        }
+        return null;
+    }
+
+    /// <summary>★ S124 (K4) — move every recognised file of a season ≥ <paramref name="pendingSeasonId"/>
+    /// into <c>career.orphans/</c>. Returns what was moved, as paths relative to the career's
+    /// folder with '/' separators, in the order moved (events first, then the log folder, each by
+    /// name). A folder that does not exist, or is not a folder, holds nothing to move.</summary>
+    private static List<string> CareerSetAsideUnfinished(string historyPath, long pendingSeasonId)
+    {
+        var plan = new List<(string Source, string Relative)>();
+        foreach (var (folder, suffixes) in new[]
+                 {
+                     (MteRecordFolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }),
+                     (GameLogWriter.LogFolderFor(historyPath), CareerSeasonFileSuffixesInLogFolder),
+                 })
+        {
+            if (!Directory.Exists(folder)) continue;
+            var folderName = Path.GetFileName(folder);
+            foreach (var file in Directory.GetFiles(folder).OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
+            {
+                var name = Path.GetFileName(file);
+                var season = CareerSeasonOfFileName(name, suffixes);
+                if (season is { } s && s >= pendingSeasonId)
+                    plan.Add((file, folderName + "/" + name));
+            }
+        }
+        var moved = new List<string>();
+        if (plan.Count == 0) return moved;
+
+        var orphans = CareerOrphansFolderFor(historyPath);
+        foreach (var (source, relative) in plan)
+        {
+            try
+            {
+                var target = Path.Combine(orphans, relative.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var free = target;
+                for (var k = 1; File.Exists(free) || Directory.Exists(free); k++)
+                    free = target + "." + k.ToString(CultureInfo.InvariantCulture);
+                File.Move(source, free, overwrite: false);
+                moved.Add(relative);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException(
+                    $"SEASON CLOSE REFUSED: could not set aside '{source}' into '{orphans}' — {ex.Message} " +
+                    "Nothing was published; the career is still at its last finished season.", ex);
+            }
+        }
+        return moved;
     }
 
     private static byte[] MteRecordBytes(
@@ -939,7 +1031,7 @@ internal static partial class Program
         return stream.ToArray();
     }
 
-    // ── S98: the record is REPLACED, never rebuilt ───────────────────────────────
+    // ── S98: the record's finishes, S124: computed in memory ──────────────────────
 
     /// <summary>★ S98 — the second word <c>playStatus</c> may hold. It gains no third: a field
     /// either played to a full placement or it did not play at all (a dormant or short event
@@ -947,57 +1039,46 @@ internal static partial class Program
     /// modelled state.</summary>
     private const string MtePlayStatusCompleted = "Completed";
 
-    /// <summary>★ S98 — REPLACED, NEVER REBUILT. The file on disk is the authority for who was
-    /// in the tournament; this reads it, validates it, and writes it back with the finishes
-    /// filled in. It never re-seats from the current world, because a world edited between the
-    /// commit and now would silently rewrite history.
+    /// <summary>★ S98, S124 (K3) — the final record's bytes, from the NotPlayed body the set-up
+    /// built. PURE: no file is read or written. The body is the authority for who was in the
+    /// tournament; this validates it and re-emits it with the finishes filled in. It never
+    /// re-seats from the current world, because a world edited between the set-up and the close
+    /// would silently rewrite history.
     ///
-    /// <para>Validated before a byte is written: the format version, the career it belongs to,
-    /// the season it names, that every event still says <c>NotPlayed</c>, that no finishes are
-    /// already present, and that the seats on disk are the seats the games were actually
-    /// played between. The first five are corruption tripwires and throw; there is no reopen
-    /// path for a completed season (a career-bound season always reserves a NEW id, and S97's
-    /// collision precheck refuses before spending anything), so a record already marked
-    /// Completed means something is wrong rather than something is finished.</para>
+    /// <para>Validated before anything is produced, exactly as S98 validated the file on disk:
+    /// the format version, the career it belongs to, the season it names, that every event
+    /// still says <c>NotPlayed</c>, that no finishes are already present, and that the seats in
+    /// the record are the seats the games were actually played between — compared as the WHOLE
+    /// seat-to-school map, so a swapped pair fails as readily as a missing one. Every refusal
+    /// throws; nothing is written by this method in any case.</para>
     ///
-    /// <para>Atomic by the same means as the first write: a whole temp file, then one rename.
-    /// A failure before the rename leaves the NotPlayed record byte-identical and the season
-    /// still valid and played — the page says the finishes could not be persisted, and there
-    /// is no retry inside the run.</para>
-    ///
-    /// <para><paramref name="replace"/> is the INJECTED SEAM, and it exists so a check can
-    /// force a failure at the rename without reaching for file permissions, an invalid path,
-    /// OS locking or a global mutable switch — every one of which would prove something about
-    /// the filesystem rather than about this method.</para></summary>
+    /// <para>The writer is <see cref="MteWriteRecord"/>; S98's injected rename seam lives there
+    /// now.</para></summary>
     /// <param name="showcaseResults">★ S104 — the showcase half. A showcase COMPLETES with two
     /// results and NO PLACEMENT: its <c>finishBySeat</c> stays null forever, which is the
     /// honest record of an event nobody wins. The alternative the review named — synthesising
     /// a fake placement of winner-1/loser-2 twice — passes the existing validator and quietly
     /// invents a champion, so "played" is carried by <paramref name="seatsPlayedByEvent"/>
     /// rather than by the presence of finishes.</param>
-    private static void MteReplaceRecordWithFinishes(
-        HistoryStore history, long seasonId,
+    private static byte[] MteFinalRecordBytes(
+        byte[] notPlayedBody, string historyId, long seasonId,
         IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent,
         IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> seatsPlayedByEvent,
-        IReadOnlyList<ShowcaseResult>? showcaseResults = null,
-        Action<string, string>? replace = null)
+        IReadOnlyList<ShowcaseResult>? showcaseResults = null)
     {
-        var final = MteRecordPathFor(history.Path, seasonId);
-        var existing = File.ReadAllBytes(final);
-
-        using var doc = JsonDocument.Parse(existing);
+        using var doc = JsonDocument.Parse(notPlayedBody);
         var root = doc.RootElement;
+        var seasonText = seasonId.ToString(CultureInfo.InvariantCulture);
 
         void Refuse(string why) => throw new InvalidOperationException(
-            $"SEASON EVENT RECORD REFUSED: '{final}' {why}. Nothing was written and the record on " +
-            "disk is untouched.");
+            $"SEASON EVENT RECORD REFUSED: the record for season {seasonText} {why}. Nothing was written.");
 
         if (root.ValueKind != JsonValueKind.Object) Refuse("is not an object");
         if (!root.TryGetProperty("formatVersion", out var fv) || !fv.TryGetInt32(out var version)
             || version != MteRecordFormatVersion)
             Refuse($"is not format version {MteRecordFormatVersion.ToString(CultureInfo.InvariantCulture)}");
         if (!root.TryGetProperty("historyId", out var hid) || hid.ValueKind != JsonValueKind.String
-            || !string.Equals(hid.GetString(), history.HistoryId, StringComparison.Ordinal))
+            || !string.Equals(hid.GetString(), historyId, StringComparison.Ordinal))
             Refuse("belongs to another career");
         if (!root.TryGetProperty("seasonId", out var sid) || !sid.TryGetInt64(out var embedded)
             || embedded != seasonId)
@@ -1021,18 +1102,18 @@ internal static partial class Program
 
             if (!seatsPlayedByEvent.TryGetValue(eid.GetInt32(), out var played)) continue;
 
-            // ★ The seats on disk ARE the field that played. Compared as a whole map, so a
+            // ★ The seats in the record ARE the field that played. Compared as a whole map, so a
             //   swapped pair — same schools, different seats — is caught as readily as a
             //   missing one.
-            var onDisk = new Dictionary<int, int>();
+            var inRecord = new Dictionary<int, int>();
             if (ev.TryGetProperty("seats", out var seats) && seats.ValueKind == JsonValueKind.Array)
                 foreach (var s in seats.EnumerateArray())
                     if (s.TryGetProperty("seat", out var sn) && sn.TryGetInt32(out var seatNo)
                         && s.TryGetProperty("schoolId", out var sc) && sc.TryGetInt32(out var schoolId))
-                        onDisk[seatNo] = schoolId;
-            if (onDisk.Count != played.Count
-                || played.Any(kv => !onDisk.TryGetValue(kv.Key, out var got) || got != kv.Value))
-                Refuse($"event {eid.GetInt32().ToString(CultureInfo.InvariantCulture)}'s seats on disk " +
+                        inRecord[seatNo] = schoolId;
+            if (inRecord.Count != played.Count
+                || played.Any(kv => !inRecord.TryGetValue(kv.Key, out var got) || got != kv.Value))
+                Refuse($"event {eid.GetInt32().ToString(CultureInfo.InvariantCulture)}'s seats in the record " +
                        "are not the field these games were played between");
         }
 
@@ -1043,27 +1124,8 @@ internal static partial class Program
             if (!seen.Contains(eventId))
                 Refuse($"carries no event {eventId.ToString(CultureInfo.InvariantCulture)} that played");
 
-        var bytes = MteRecordBytesWithFinishes(
-            root, finishBySeatByEvent, seatsPlayedByEvent, showcaseResults);
-
-        var folder = MteRecordFolderFor(history.Path);
-        var temp = Path.Combine(folder, $".charm-events-{Guid.NewGuid():N}.tmp");
-        File.WriteAllBytes(temp, bytes);
-        try
-        {
-            (replace ?? MteDefaultReplace)(temp, final);
-        }
-        catch
-        {
-            try { File.Delete(temp); } catch (IOException) { /* best effort */ }
-            throw;
-        }
+        return MteRecordBytesWithFinishes(root, finishBySeatByEvent, seatsPlayedByEvent, showcaseResults);
     }
-
-    /// <summary>The real rename. Overwrite is correct here and only here: the destination is
-    /// this run's own NotPlayed record, published minutes earlier at the commit.</summary>
-    private static void MteDefaultReplace(string temp, string final)
-        => File.Move(temp, final, overwrite: true);
 
     /// <summary>Re-emit the record with the finishes filled in. Every property that is not
     /// <c>playStatus</c> or <c>finishBySeat</c> is copied through verbatim, so nothing this
@@ -1244,13 +1306,8 @@ internal static partial class Program
             lines.Add($"  Dormant this season: {string.Join(", ", seating.Dormant.Select(d => d.Name))}");
         foreach (var d in outcome.HistoryDiagnostics)
             lines.Add($"  Event history hole — {d}");
-        if (outcome.RecordStatus == EventRecordStatus.WriteFailed)
-            lines.Add($"  EVENT RECORD NOT WRITTEN — {outcome.RecordDiagnostic} " +
-                      "(the season is valid and played; this year is a hole in event history)");
-        if (outcome.FinishStatus == EventRecordStatus.WriteFailed)
-            lines.Add($"  EVENT FINISHES NOT PERSISTED — {outcome.FinishDiagnostic} " +
-                      "(the tournaments were played and the games count; the permanent record " +
-                      "cannot say who won)");
+        // ★ S124 (K5) — the two write-failure lines are retired: a record that cannot be
+        //   written fails the close, so a season with a page always has its record.
         return lines;
     }
 }

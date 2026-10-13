@@ -15,22 +15,36 @@ namespace Charm.History;
 //  else. A scheme that filled holes would have to KNOW which numbers were free,
 //  which means a list, which means the list can be wrong.
 //
-//  ★ ORDER PER BATCH: reserve -> make it durable -> only then hand the numbers
-//  out. Backwards would mean a crash between issuing and persisting leaves the
-//  file believing those numbers are still available while people are already
-//  wearing them. Losing a range to a crash is free; reissuing one is fatal.
+//  ★ S124 — NUMBERS ARE HELD UNTIL THE SEASON CLOSES (B1a, K1). A reservation
+//  moves the in-memory counters and writes nothing; `PublishReservations` makes
+//  them durable, once, as the LAST write of a season's close. A store disposed
+//  without publishing has issued nothing: its numbers were never on disk.
+//
+//  This reverses S89's "reserve -> make durable -> hand out" order, and the
+//  reversal is safe for one reason that must stay true: a held number reaches
+//  disk only inside the season's own files, and those are written only at the
+//  close, BEFORE the counters. If the close does not finish, the counters still
+//  say that season is unplayed, and the next close sets every file of that season
+//  or later aside (`career.orphans/`) before it writes. So no published file ever
+//  holds a number that is later handed out again. (S89 said "losing a range to a
+//  crash is free; reissuing one is fatal" — still true of a PUBLISHED number,
+//  which is never reissued.)
+//
+//  `PublishReservations` is the transitional v3 season-close publication, not the
+//  career's save transaction: B1b replaces it with the manifest swap.
 //
 //  ★ THE LOCK IS A SIDECAR, NOT THE FILE ITSELF. Holding the data file open
 //  exclusively and then atomically replacing that same file does not work on
 //  Windows — the replace needs the file not to be held. So the lock is a
 //  separate `.lock` file next to it, taken FIRST, before existence is even
 //  checked (checking first is the creation race), and held across load,
-//  validation, every reservation, and every replacement.
+//  validation, every reservation, and every replacement. ★ S124 (K2): it is held
+//  for the whole season, through play, until the store is disposed.
 //
 //  ★ NEVER A FALLBACK. If the file cannot be made durable — read-only folder,
-//  full disk, another process holding the lock — no identities are issued at
-//  all and the run stops. An in-memory fallback would produce a season whose
-//  numbers exist nowhere, which is worse than not running.
+//  full disk, another process holding the lock — the season is not published
+//  and the run stops. A season whose counters cannot be published is played
+//  again next run, never kept on the side.
 //
 //  Durability is claimed against ordinary process failure and normal atomic
 //  filesystem behaviour. Not against a machine losing power mid-write.
@@ -279,9 +293,13 @@ public sealed class HistoryStore : IDisposable
 
     private enum Counter { Person, Season, Game }
 
-    /// <summary>Checked half-open arithmetic: `start = next`, `end = next + n`, persist
-    /// `next = end`, issue `[start, end)`. An oversized batch rejects the WHOLE
-    /// reservation with the file untouched — never a partial advance.</summary>
+    /// <summary>Checked half-open arithmetic: `start = next`, `end = next + n`, hold
+    /// `next = end` in memory, issue `[start, end)`. An oversized batch rejects the WHOLE
+    /// reservation with the counters untouched — never a partial advance.
+    ///
+    /// <para>★ S124 (K1) — nothing is written here. The numbers are provisional until
+    /// <see cref="PublishReservations"/>; a store disposed before that discards them, and
+    /// the next open hands the same numbers out again (see the header).</para></summary>
     private long Reserve(int count, Counter which)
     {
         if (_lockHandle is null)
@@ -324,17 +342,29 @@ public sealed class HistoryStore : IDisposable
             _              => _state with { NextGameId   = end },
         };
 
-        PublishAtomically(_path, advanced);   // durable BEFORE anything is handed out
-        _state = advanced;
+        _state = advanced;                     // ★ S124 — held; published at the close
         return next;
     }
 
-    /// <summary>Release the lock once every reservation the run will make is complete —
-    /// before the long simulation, which issues nothing.</summary>
+    /// <summary>★ S124 (K2) — no further reservation may be made on this store. The lock is
+    /// NOT released: the season's close still needs it to publish, and a second run must not
+    /// start the same season while this one plays. <see cref="Dispose"/> releases it.
+    /// Nothing clears this flag, so one store serves one season.</summary>
     public void CloseReservations()
     {
         _reservationsClosed = true;
-        ReleaseLock();
+    }
+
+    /// <summary>★ S124 (K1) — write the counters as they stand, atomically. The v3 season-close
+    /// publication: the LAST write of a season's close, after every season file. Legal after
+    /// <see cref="CloseReservations"/>; requires the lock. An exception means the career file was
+    /// not replaced (the temp-then-rename either happens or does not).</summary>
+    public void PublishReservations()
+    {
+        if (_lockHandle is null)
+            throw new HistoryException(HistoryError.PersistFailed,
+                "the history lock has already been released; the reservations cannot be published.");
+        PublishAtomically(_path, _state);
     }
 
     public void Dispose()

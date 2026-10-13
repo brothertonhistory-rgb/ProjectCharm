@@ -266,10 +266,8 @@ internal static partial class Program
                 InitialPlayerClass(divvySeed, pid)));   // ★ S113 — the one place a class is drawn
         }
 
-        // ★ S89 — ONE reservation for the whole cohort, made durable before a single
-        // number is handed out. Not one write per player: 4,511 file replacements to
-        // number one class would be slow AND would leave 4,510 windows in which a crash
-        // strands a partly-numbered pool. One range, one write, all or nothing.
+        // ★ S89 — ONE reservation for the whole cohort, not one per player: one range,
+        // all or nothing. ★ S124 — held in memory and published with the season's close.
         //
         // The number does NOT go on PoolPlayer. The pool row is compared field-by-field
         // and `with`-cloned by Phase 54's rigged-pool checks, and an identity riding along

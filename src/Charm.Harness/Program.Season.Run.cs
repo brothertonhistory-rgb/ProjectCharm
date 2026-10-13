@@ -16,17 +16,24 @@ namespace Charm.Harness;
 //      run.AdvanceThrough(run.LastLegalDay);
 //      var outcome = run.Finish();
 //
-//  NOTHING ABOUT THE BASKETBALL AND NOTHING ON DISK CHANGES (K8). The set-up, the
-//  game and the close are S122's code, moved: the set-up into the constructor, the
-//  game (`PlayOneGame`, S98's local function) into an instance method, the close into
-//  `Finish`. Every value the game or the close read from the set-up is a FIELD, named
-//  exactly as the local it was, so both bodies moved character for character.
+//  NOTHING ABOUT THE BASKETBALL CHANGES (K8). The set-up, the game and the close are
+//  S122's code, moved: the set-up into the constructor, the game (`PlayOneGame`, S98's
+//  local function) into an instance method, the close into `Finish`. Every value the
+//  game or the close read from the set-up is a FIELD, named exactly as the local it was.
 //
-//    SeasonBegin  — every write the set-up made, in the same order: the reservations,
-//                   the event record, the scouting file, the log's creation and roster.
+//  ★ S124 (B1a) — A SEASON WRITES NOTHING UNTIL IT CLOSES.
+//    SeasonBegin    — writes nothing. The numbers are held in the career store's memory;
+//                     the event record's NotPlayed body and the log's roster are built
+//                     in memory.
 //    AdvanceThrough — writes nothing.
-//    Finish       — every write the close made: the log's blocks, its finalize, the
-//                   event record's replacement.
+//    Finish         — every write, in this order, each only for a career season and under
+//                     the same condition as before: (1) set aside any file of this season
+//                     or later left by a close that did not finish, (2) the log, (3) the
+//                     scouting file, (4) the event record, written once, (5) the career
+//                     file's counters — LAST. The outcome is built before (1), so once (5)
+//                     has replaced the career file nothing after it can fail: the season is
+//                     committed. A season stopped anywhere before (5) leaves the career file
+//                     byte-identical and is played again, identically, next run.
 //
 //  ★ THE INVENTORY (K6). Every instance field of this class, of SeasonCalendarRun and
 //  of the five game sources is named in Phase 114's frozen list, by name, type and
@@ -38,10 +45,11 @@ namespace Charm.Harness;
 //  ★ LIFECYCLE (K9). A precondition refusal (backwards, past the end, Finish early or
 //  twice) is raised before anything plays and leaves the run usable. Any exception
 //  while playing or closing faults the run: the original propagates, every later call
-//  is refused by name, and the run is never retried in memory. Dispose releases the
-//  season log's file and lock (deleting nothing) and never touches the career store,
-//  which belongs to the caller. An abandoned or faulted run leaves the disk exactly as
-//  a crash did before this session; repairing that is B1's.
+//  is refused by name, and the run is never retried in memory. ★ S124 — the run holds
+//  no file during play (the season log's writer lives only inside the close), and it
+//  never touches the career store's lifetime, which belongs to the caller; the career
+//  lock is released when the caller disposes the store. An abandoned or faulted run
+//  leaves the career file exactly as it was before the season.
 // ============================================================================
 
 internal static partial class Program
@@ -58,7 +66,8 @@ internal static partial class Program
         DivvyResult? RostersInHand = null,
         bool BootstrapPeopleForTest = false,
         int? SeasonYear = null,
-        SeasonPlayOrder? PlayOrderForTest = null);
+        SeasonPlayOrder? PlayOrderForTest = null,
+        Action<string>? CloseStepForTest = null);
 
     /// <summary>★ S123 — the season's set-up, run now; the season is then played by
     /// <see cref="SeasonRun.AdvanceThrough"/> and closed by <see cref="SeasonRun.Finish"/>.</summary>
@@ -81,8 +90,10 @@ internal static partial class Program
         private readonly SeasonMemoryOutcome memoryOutcome;
         private readonly SeasonRotationOutcome rotationOutcome;
         private readonly NonConDateReport nonConferenceDates;
-        private readonly EventRecordStatus recordStatus;
-        private readonly string? recordDiagnostic;
+        private readonly byte[]? eventRecordBody;                         // ★ S124 — the NotPlayed record, built at set-up, written at the close
+        private readonly bool keepsLog;                                   // ★ S124 — was `gameLog is not null`
+        private readonly List<RosterEntryV2>? logRoster;                  // ★ S124 — the log's roster, built at set-up, written at the close
+        private readonly bool verbose;                                    // ★ S124 — the close prints what it set aside
         private readonly DivvyResult divvy;
         private readonly PeopleSummary? people;
         private readonly DevelopmentStep? development;
@@ -126,7 +137,8 @@ internal static partial class Program
         private readonly List<SeasonGameResult?> resultSlots;
 
         // ── Resources and callbacks (recreate or rebind; never data) ────────────────
-        private readonly GameLogWriter? gameLog;
+        //  ★ S124 — the season log's writer is no longer a field: it is a local of the close.
+        private readonly Action<string>? closeStepForTest;                 // ★ S124 (K6) — null on every production path
 
         // ── The run's lifecycle (K9) ────────────────────────────────────────────────
         private bool finished;
@@ -137,6 +149,8 @@ internal static partial class Program
         {
             //  The options, under the parameter names the set-up has always read.
             history = options.History;
+            this.verbose = verbose;
+            closeStepForTest = options.CloseStepForTest;
             var retainGameLog = options.RetainGameLog;
             var roadShaveOverride = options.RoadShaveOverride;
             var debtWindowOverride = options.DebtWindowOverride;
@@ -173,13 +187,14 @@ internal static partial class Program
             //    4. build the conference slate                        (unchanged)
             //    5. date it                                           (unchanged)
             //    6. refuse a seated school double-booked in its window
-            //    7. refuse a record already claiming the pending season
-            //    8. SPEND the season and game numbers                 ← the commit
-            //    9. publish the permanent record
+            //    7. (S97's refusal of a record already claiming the pending season is
+            //       retired at S124: the close sets such a file aside instead)
+            //    8. take the season and game numbers                  (held in memory)
+            //    9. build the permanent record's NotPlayed body       (in memory)
             //
-            //    Anything that fails at 1-7 leaves NO season id spent and NO file written.
-            //    Past 8 the season is committed: a record write that then fails does not
-            //    invalidate the basketball, it leaves a deliberate hole in event history.
+            //    ★ S124 — NOTHING here writes. The numbers are spent, and the record and
+            //    every other season file written, only at the close, with the career file
+            //    LAST; a season that stops anywhere before then has spent nothing.
             // ══════════════════════════════════════════════════════════════════════════
             pendingSeasonId = history?.PeekNextSeasonId ?? 0;
             // ★ S119 — THE SEASON'S YEAR, resolved ONCE, at step 1, and handed to every dater.
@@ -282,10 +297,8 @@ internal static partial class Program
                 : BuyBuildPlans(world, nonConferenceDates, matching, contracts);
 
             MteRefuseOverlap(world, seating, schedule, seasonYearOfRun);
-            MteRefuseExistingRecord(history, pendingSeasonId);
 
-            recordStatus = EventRecordStatus.NotApplicable;
-            recordDiagnostic = null;
+            eventRecordBody = null;
             // ★ S98 — legacy mode plays its tournaments too. The fixtures simply stay unnumbered,
             //   exactly as legacy conference fixtures always have: basketball does not require a
             //   career. So the reservation table is empty here and the bracket factory asks for an
@@ -311,17 +324,9 @@ internal static partial class Program
                 confTourneyReservations = numbering.ConfTourneyReservations;
                 buyReservations = numbering.BuyReservations;
                 seasonIdOfRun = numbering.SeasonId;
-                try
-                {
-                    MtePublishRecord(history, numbering.SeasonNumber, seasonSeed, world, seating,
-                                     contracts.Survivors, BuildPairingLog(contracts, matching));
-                    recordStatus = EventRecordStatus.Written;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    recordStatus = EventRecordStatus.WriteFailed;
-                    recordDiagnostic = ex.GetType().Name;
-                }
+                // ★ S124 (K3) — the exact bytes S97 published here, held for the close.
+                eventRecordBody = MteRecordBytes(history, numbering.SeasonNumber, seasonSeed, world, seating,
+                                                 contracts.Survivors, BuildPairingLog(contracts, matching));
             }
 
             // ★ S115 — three ways to get this season's people, in this order: rosters handed in
@@ -376,8 +381,9 @@ internal static partial class Program
                     IdentityGuard.Require(sg.SeasonId, "a scheduled fixture");
                     IdentityGuard.Require(sg.GameId, "a scheduled fixture");
                 }
-                // Nothing after schedule construction issues an identity, so the lock is
-                // released before the long simulation rather than held across it.
+                // Nothing after schedule construction issues an identity, so reservations close
+                // here. ★ S124 (K2) — the career LOCK is kept: the close publishes under it, and a
+                // second run must not start this season while it plays.
                 history.CloseReservations();
             }
 
@@ -424,99 +430,75 @@ internal static partial class Program
             baseSeed = unchecked((int)seasonSeed);
 
             //  ── S90: the retention log. ────────────────────────────────────────────
-            //  Built here, before the first tip, because the roster section is written
-            //  before game one and the rows it lists are these rows — the start-of-season
-            //  card, which is the only version that exists at write time (R8).
+            //  The roster is built here, before the first tip, because the rows it lists are
+            //  these rows — the start-of-season card (R8). ★ S124 — it is WRITTEN at the close,
+            //  with the scouting file, and the writer validates the whole roster there before it
+            //  touches the filesystem (K8: a bad name refuses at the close with nothing published).
+            keepsLog = retainGameLog && history is not null;
+            logRoster = keepsLog ? BuildRetentionRoster(rowsBySchool, divvy) : null;
+
+            // ══════════════════════════════════════════════════════════════════════════
+            //  ★ S122 — THE SEASON ON THE CALENDAR (Program.Season.Calendar.cs).
             //
-            //  ★ The writer VALIDATES THE WHOLE ROSTER IN MEMORY before it touches the
-            //  filesystem, so an overlong name or a bad domain refuses with nothing on disk
-            //  to clean up. Publication of the roster is one deliberate transition.
-            gameLog = null;
-            if (retainGameLog && history is not null)
-            {
-                var roster = BuildRetentionRoster(rowsBySchool, divvy);
-                // ★ S121 — this season's people's hidden state, written whole once, beside the log.
-                if (devStates is not null)
-                    ScoutingFile.Write(history.Path, history.HistoryId, history.WorldFingerprint,
-                                       schedule[0].SeasonId!.Value, DevScoutingRecords(divvy, devStates));
-                gameLog = GameLogWriter.Create(
-                    history.Path, history.HistoryId, history.WorldFingerprint, fingerprint,
-                    schedule[0].SeasonId!.Value, roster);
-            }
+            //  Every game keeps the fixture ordinal it has always had — the league slate at
+            //  0 .. N-1, then the brackets, the showcases, the conference tournaments and the
+            //  buy games, each kind numbered after the last — so `baseSeed + 2g` hands every
+            //  game the exact seeds it had before this session existed. What changed is the
+            //  order they are PLAYED in: one day at a time from November 1 to the championship
+            //  Monday, each day's games in ordinal order. From S98 to S121 they were played in
+            //  ordinal order, November tournaments after March; that is retired.
+            //
+            //  The sources are built here, before the first tip: every game's ordinal and date
+            //  is known now, even a bracket's later rounds, whose sides depend on results but
+            //  whose dates do not.
+            // ══════════════════════════════════════════════════════════════════════════
+            var prestigeById = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
+            var leagueSource = new SeasonStaticSource(
+                "the league slate",
+                schedule.Select((sg, i) => new PlayedSeasonGame(sg, i)).ToList());
+            bracketSources = MteBracketSources(
+                seating, prestigeById, reservations, seasonIdOfRun, schedule.Count, seasonYearOfRun);
+            var bracketGameCount = bracketSources.Sum(b => b.Count);
+            //  ★ S104 — THE SHOWCASES, NUMBERED AFTER EVERY BRACKET (see MteExpectedBracketSlots — the
+            //    reservation walk and this numbering are the same order, and they must stay that way).
+            showcaseSource = new MteShowcaseSource(
+                seating, reservations, seasonIdOfRun, schedule.Count + bracketGameCount, seasonYearOfRun);
+            eventGameCount = bracketGameCount + showcaseSource.Count;
+            //  ★ S110 — THE CONFERENCE TOURNAMENTS, NUMBERED AFTER EVERY EVENT GAME, ascending
+            //    conference id then topology game index 0..6, as the reservation walk
+            //    (ConfTourneyExpectedSlots) spends them. Each reads its league's results from
+            //    `resultSlots` the morning it opens — league results only, by ordinal, so a
+            //    tournament win can never become a league win.
+            (confTourneySources, leaguesTooSmall) = ConfTourneySources(
+                world, seasonYearOfRun, schedule, resultSlots,
+                confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount);
+            var confTourneyGameCount = confTourneySources.Sum(c => c.Count);
+            //  ★ S111 — THE BUY GAMES, NUMBERED AFTER EVERY CONFERENCE TOURNAMENT GAME, in the dater's
+            //    pairing order, which is also the reservation order.
+            buySource = new BuyGameSource(
+                buyPlans, buyReservations, seasonIdOfRun,
+                schedule.Count + eventGameCount + confTourneyGameCount);
 
-            //  ★ S123 (K9) — from here to the end of the set-up, a failure releases the season log's
-            //    file and lock rather than leaving them held until the process ends. The files on disk
-            //    are exactly what they were: the release closes a handle and deletes nothing.
-            try
-            {
-                // ══════════════════════════════════════════════════════════════════════════
-                //  ★ S122 — THE SEASON ON THE CALENDAR (Program.Season.Calendar.cs).
-                //
-                //  Every game keeps the fixture ordinal it has always had — the league slate at
-                //  0 .. N-1, then the brackets, the showcases, the conference tournaments and the
-                //  buy games, each kind numbered after the last — so `baseSeed + 2g` hands every
-                //  game the exact seeds it had before this session existed. What changed is the
-                //  order they are PLAYED in: one day at a time from November 1 to the championship
-                //  Monday, each day's games in ordinal order. From S98 to S121 they were played in
-                //  ordinal order, November tournaments after March; that is retired.
-                //
-                //  The sources are built here, before the first tip: every game's ordinal and date
-                //  is known now, even a bracket's later rounds, whose sides depend on results but
-                //  whose dates do not.
-                // ══════════════════════════════════════════════════════════════════════════
-                var prestigeById = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
-                var leagueSource = new SeasonStaticSource(
-                    "the league slate",
-                    schedule.Select((sg, i) => new PlayedSeasonGame(sg, i)).ToList());
-                bracketSources = MteBracketSources(
-                    seating, prestigeById, reservations, seasonIdOfRun, schedule.Count, seasonYearOfRun);
-                var bracketGameCount = bracketSources.Sum(b => b.Count);
-                //  ★ S104 — THE SHOWCASES, NUMBERED AFTER EVERY BRACKET (see MteExpectedBracketSlots — the
-                //    reservation walk and this numbering are the same order, and they must stay that way).
-                showcaseSource = new MteShowcaseSource(
-                    seating, reservations, seasonIdOfRun, schedule.Count + bracketGameCount, seasonYearOfRun);
-                eventGameCount = bracketGameCount + showcaseSource.Count;
-                //  ★ S110 — THE CONFERENCE TOURNAMENTS, NUMBERED AFTER EVERY EVENT GAME, ascending
-                //    conference id then topology game index 0..6, as the reservation walk
-                //    (ConfTourneyExpectedSlots) spends them. Each reads its league's results from
-                //    `resultSlots` the morning it opens — league results only, by ordinal, so a
-                //    tournament win can never become a league win.
-                (confTourneySources, leaguesTooSmall) = ConfTourneySources(
-                    world, seasonYearOfRun, schedule, resultSlots,
-                    confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount);
-                var confTourneyGameCount = confTourneySources.Sum(c => c.Count);
-                //  ★ S111 — THE BUY GAMES, NUMBERED AFTER EVERY CONFERENCE TOURNAMENT GAME, in the dater's
-                //    pairing order, which is also the reservation order.
-                buySource = new BuyGameSource(
-                    buyPlans, buyReservations, seasonIdOfRun,
-                    schedule.Count + eventGameCount + confTourneyGameCount);
+            totalGames = schedule.Count + eventGameCount + confTourneyGameCount + buySource.Count;
+            resultSlots.AddRange(Enumerable.Repeat<SeasonGameResult?>(null, totalGames));
+            possessionSlots = new int?[totalGames];
+            sideSlots = new SidePossessionCount?[totalGames];
+            putbackSlots = new GamePutbackAudit?[totalGames];
+            laneSlots = new GameLaneAudit?[totalGames];
+            playedSlots = new PlayedSeasonGame?[totalGames];
+            logSlots = new (GameBlockFactsV1, List<PerGameStatRowV1>)?[totalGames];
 
-                totalGames = schedule.Count + eventGameCount + confTourneyGameCount + buySource.Count;
-                resultSlots.AddRange(Enumerable.Repeat<SeasonGameResult?>(null, totalGames));
-                possessionSlots = new int?[totalGames];
-                sideSlots = new SidePossessionCount?[totalGames];
-                putbackSlots = new GamePutbackAudit?[totalGames];
-                laneSlots = new GameLaneAudit?[totalGames];
-                playedSlots = new PlayedSeasonGame?[totalGames];
-                logSlots = new (GameBlockFactsV1, List<PerGameStatRowV1>)?[totalGames];
-
-                var sources = new List<SeasonGameSource> { leagueSource };
-                sources.AddRange(bracketSources);
-                sources.Add(showcaseSource);
-                sources.AddRange(confTourneySources);
-                sources.Add(buySource);
-                calendar = new SeasonCalendarRun(
-                    sources, seasonYearOfRun, options.PlayOrderForTest ?? SeasonPlayOrder.Calendar,
-                    PlayOneGame,
-                    verbose
-                        ? (month, n) => Console.WriteLine(FormattableString.Invariant($"  ... {month}: {n:N0} games"))
-                        : null);
-            }
-            catch
-            {
-                gameLog?.Dispose();
-                throw;
-            }
+            var sources = new List<SeasonGameSource> { leagueSource };
+            sources.AddRange(bracketSources);
+            sources.Add(showcaseSource);
+            sources.AddRange(confTourneySources);
+            sources.Add(buySource);
+            calendar = new SeasonCalendarRun(
+                sources, seasonYearOfRun, options.PlayOrderForTest ?? SeasonPlayOrder.Calendar,
+                PlayOneGame,
+                verbose
+                    ? (month, n) => Console.WriteLine(FormattableString.Invariant($"  ... {month}: {n:N0} games"))
+                    : null);
         }
 
         public DateOnly FirstLegalDay => calendar.FirstLegalDay;
@@ -606,7 +588,7 @@ internal static partial class Program
             foreach (var rows in new[] { identity.HomeRows, identity.AwayRows })
                 foreach (var row in rows)
                     creditsBefore[row.PoolId] = league.PlayerSeasons.TryGetValue(row.PoolId, out var rec0) ? rec0.Credits : 0;
-            var retentionBefore = gameLog is null ? null
+            var retentionBefore = !keepsLog ? null
                                 : RetentionSnapshotBefore(league, identity);
 
             var (game, result, attributed, policy) = RunSingleGenGame(
@@ -652,7 +634,7 @@ internal static partial class Program
 
             // ...and diff AFTER the last one. Emission is the games-played delta, never a
             // credits delta read after the fact. ★ S122 — built now, appended after the season (K2).
-            if (gameLog is not null && retentionBefore is not null)
+            if (keepsLog && retentionBefore is not null)
                 logSlots[g] = (
                     new GameBlockFactsV1(
                         sg.GameId!.Value, g, sg.HomeId, sg.AwayId,
@@ -763,55 +745,34 @@ internal static partial class Program
             foreach (var kv in brackets.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
             foreach (var kv in showcases.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
 
-            //  One block per fixture PLAYED and no other — league, event, conference tournament
-            //  and buy game — appended in fixture order (K2). The writer refuses to publish a
-            //  partial season rather than leaving a plausible-looking short file behind.
-            if (gameLog is not null)
-            {
+            //  ★ S124 (K3) — EVERY CHECK THAT CAN BE MADE IN MEMORY IS MADE BEFORE THE FIRST WRITE: every
+            //    log block present, the record's finishes validated against the field that played, every
+            //    game placed, the outcome built. Then the writes, with the career file last.
+            if (keepsLog)
                 for (var g = 0; g < totalGames; g++)
-                {
-                    var block = logSlots[g] ?? throw new InvalidOperationException(
-                        $"SEASON INVARIANT VIOLATED: fixture ordinal {g} played but built no log block.");
-                    gameLog.AppendGame(block.Facts, block.Rows);
-                    logSlots[g] = null;
-                }
-                gameLog.Finalize(totalGames);
-                gameLog.Dispose();
-            }
+                    if (logSlots[g] is null)
+                        throw new InvalidOperationException(
+                            $"SEASON INVARIANT VIOLATED: fixture ordinal {g} played but built no log block.");
 
-            //  ★ S98 — THE SECOND WRITE, and the order below is the resolution of a real
-            //  contradiction: the record replacement cannot be the last write AND have its
-            //  failure reported on the page. It is not. The replacement is attempted here,
-            //  its outcome is carried out on the run result, and the page — which prints
-            //  after this method returns and after the career file is closed — says what
-            //  happened. A failure leaves the NotPlayed record byte-identical, the season
-            //  valid and played, and no retry inside the run.
-            var finishStatus = EventRecordStatus.NotApplicable;
-            string? finishDiagnostic = null;
             //  ★ S104 — the gate is "did ANY event play", not "are there finishes". A season whose
             //  only events were showcases produces no placement at all and still must have its
             //  record completed — keying on the finishes would have left those events reading
-            //  NotPlayed forever, with every check green.
-            if (history is not null && recordStatus == EventRecordStatus.Written
-                && seatsPlayedAll.Count > 0)
-            {
-                try
-                {
-                    MteReplaceRecordWithFinishes(
-                        history, pendingSeasonId, brackets.FinishBySeat, seatsPlayedAll,
-                        showcases.Results);
-                    finishStatus = EventRecordStatus.Written;
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    finishStatus = EventRecordStatus.WriteFailed;
-                    finishDiagnostic = ex.GetType().Name;
-                }
-            }
+            //  NotPlayed forever, with every check green. ★ S124 — the record is written ONCE: the
+            //  final bytes when any event played, otherwise the NotPlayed body, which is exactly
+            //  what the file used to end up as.
+            var anyEventPlayed = seatsPlayedAll.Count > 0;
+            byte[]? recordBytes = null;
+            if (history is not null)
+                recordBytes = anyEventPlayed
+                    ? MteFinalRecordBytes(eventRecordBody!, history.HistoryId, pendingSeasonId,
+                                          brackets.FinishBySeat, seatsPlayedAll, showcases.Results)
+                    : eventRecordBody!;
 
             var eventOutcome = new EventSeasonOutcome(
-                seating, recordStatus, recordDiagnostic, eventHistory.Diagnostics,
-                finishStatus, finishDiagnostic);
+                seating,
+                history is not null ? EventRecordStatus.Written : EventRecordStatus.NotApplicable,
+                eventHistory.Diagnostics,
+                history is not null && anyEventPlayed ? EventRecordStatus.Written : EventRecordStatus.NotApplicable);
 
             // ★ S109 — BOUNDARY TWO. Bracket games are built round by round DURING play, so no
             //   complete played-game list exists before the first tip; the event half can only be
@@ -819,7 +780,7 @@ internal static partial class Program
             //   (S111: a neutral buy game carries none).
             AssertEveryGamePlaced(playedGames.Select(p => p.Game), "SeasonRunOutcome");
 
-            return new SeasonRunOutcome
+            var outcome = new SeasonRunOutcome
             {
                 Schedule = schedule, Fingerprint = fingerprint, Results = results,
                 Wins = wins, Losses = losses, Divvy = divvy, League = league, Ties = ties,
@@ -862,16 +823,77 @@ internal static partial class Program
                 BuyGamesFingerprint = BuyGamesFingerprint(buyGames.Rows),
                 LeagueRoadSidesShaved = leagueRoadSidesShaved,
             };
+
+            if (history is not null)
+                WriteCareerSeason(history, recordBytes!);
+            return outcome;
         }
 
-        /// <summary>Releases the season log's file and lock (closes, deletes nothing). Never touches
-        /// the career store. Idempotent; after it every call is refused by name.</summary>
+        /// <summary>★ S124 (K3) — every write a career season makes, in this order: the set-aside, the
+        /// log, the scouting file, the event record, the career file's counters. THE COMMIT BOUNDARY:
+        /// the publish is the last step that can fail. An exception from it means the career file was
+        /// not replaced (temp, then one rename); anything before it leaves the career file exactly as
+        /// it was, and the season is played again next run, its stray files set aside first.</summary>
+        private void WriteCareerSeason(HistoryStore store, byte[] recordBytes)
+        {
+            void Step(string name) => closeStepForTest?.Invoke(name);
+
+            Step("set-aside");
+            var setAside = CareerSetAsideUnfinished(store.Path, pendingSeasonId);
+            if (verbose && setAside.Count > 0)
+                Console.WriteLine("  Set aside from a season that did not finish closing (career.orphans): " +
+                                  string.Join(", ", setAside));
+
+            if (keepsLog)
+            {
+                Step("log");
+                var gameLog = GameLogWriter.Create(
+                    store.Path, store.HistoryId, store.WorldFingerprint, fingerprint,
+                    schedule[0].SeasonId!.Value, logRoster!);
+                try
+                {
+                    Step("log-open");
+                    //  One block per fixture PLAYED and no other, appended in fixture order (K2). The
+                    //  writer refuses to publish a partial season rather than leaving a plausible-looking
+                    //  short file behind.
+                    for (var g = 0; g < totalGames; g++)
+                    {
+                        var block = logSlots[g]!.Value;
+                        gameLog.AppendGame(block.Facts, block.Rows);
+                        logSlots[g] = null;
+                    }
+                    gameLog.Finalize(totalGames);
+                }
+                finally
+                {
+                    gameLog.Dispose();
+                }
+            }
+
+            // ★ S121 — this season's people's hidden state, written whole once, beside the log.
+            if (devStates is not null)
+            {
+                Step("scouting");
+                ScoutingFile.Write(store.Path, store.HistoryId, store.WorldFingerprint,
+                                   schedule[0].SeasonId!.Value, DevScoutingRecords(divvy, devStates));
+            }
+
+            Step("record");
+            MteWriteRecord(store.Path, pendingSeasonId, recordBytes);
+
+            Step("counters");
+            store.PublishReservations();
+            Step("published");
+        }
+
+        /// <summary>Ends the run. ★ S124 — the run holds no file (the close's log writer is disposed
+        /// inside the close), and it never touches the career store, which belongs to the caller.
+        /// Idempotent; after it every call is refused by name.</summary>
         public void Dispose()
         {
             if (disposed) return;
             disposed = true;
             calendar.Dispose();
-            gameLog?.Dispose();
         }
     }
 }

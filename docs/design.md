@@ -8986,7 +8986,7 @@ might have** — see "What is deliberately absent" below.
 
 | section | what it holds |
 |---|---|
-| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, all **38 authored ratings**, and — **roster schema 2, S115** — his class (0 Fr .. 3 Sr), his defensive plane and his offensive role. 256 bytes. Written and read as schema 2 only (from S117, C-60: an older roster is refused with the rest of an older career) |
+| **roster** (the start-of-season card, written once — at the season's close since S124) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, all **38 authored ratings**, and — **roster schema 2, S115** — his class (0 Fr .. 3 Sr), his defensive plane and his offensive role. 256 bytes. Written and read as schema 2 only (from S117, C-60: an older roster is refused with the rest of an older career) |
 | **game blocks** (one per fixture) | **block schema 3 (S117).** A 56-byte header: the game's own facts — teams, score, overtimes, possessions, its **kind** (0 league, 2 conference tournament, 1 other), its **date** and its **site** (hosted or neutral) (S116) — then the **score by period** (S117): two int32s (home, away) for the first half, the second half and each overtime, always 2 + OT entries, a scoreless period 0-0. Then one **row per man who played**: his identity and season context, 21 counters, and whether he **started** (row schema 2, S116); 196 bytes. The writer refuses a game with no date or site, one marked both league and tournament, or a period list of the wrong length, with a negative entry, or not summing to the final; the reader re-checks the period list after the block's checksum, so a flipped byte reads as corruption and a sealed wrong score as a wrong score |
 
 The roster section is not decoration. Game rows say what a man *did* and nothing about him,
@@ -9869,13 +9869,13 @@ Canonical form is specified once, in `HistorySchemaV2.Serialize`, and pinned by 
 
 There is no record of which numbers were issued and no way to hand one back. The three counters ARE the proof: every value below a counter is spent, full stop, whether it ended up on a person or was burned by a season that failed to build. A scheme that filled holes would have to KNOW which numbers were free, which means a list, which means the list can be wrong — and a wrong list means two men sharing a career. Holes are permanent and cost nothing.
 
-**Order per batch: reserve → make durable → only then hand out.** Backwards would mean a crash between issuing and persisting leaves the file believing those numbers are available while people already wear them. Losing a range to a crash is free; reissuing one is fatal.
+**Numbers are held until the season closes (S124, B1a).** A reservation moves the counters in memory and writes nothing; `PublishReservations()` writes them, atomically, as the **last** write of a season's close. A store disposed without publishing has issued nothing — its numbers were never on disk, and the next open hands the same numbers out again in the same order. That reverses S89's "reserve → make durable → hand out", and it is safe for one reason that must stay true: **a held number reaches disk only inside the season's own files, which are written at the close before the counters**, and a close that did not finish has its files set aside before the next close writes (see "A season leaves no trace until it closes"). So no published file ever holds a number that is later handed out again — S89's "reissuing one is fatal" still holds of every *published* number. `PublishReservations()` is the transitional v3 season-close publication; B1b replaces it with the career's save transaction.
 
-Arithmetic is checked and half-open: `start = next`, `end = next + n`, persist `end`, issue `[start, end)`. An oversized batch rejects the **whole** reservation with the file byte-identical — never a partial advance. A zero reservation writes nothing.
+Arithmetic is checked and half-open: `start = next`, `end = next + n`, hold `end`, issue `[start, end)`. An oversized batch rejects the **whole** reservation with the counters untouched — never a partial advance. A zero reservation is a no-op.
 
-**The lock is a sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and held across load, validation and every reservation. It is released before the long simulation, which issues nothing.
+**The lock is a sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and **held for the whole season** — load, validation, every reservation, play, and the close's publish — until the store is disposed (S124). `CloseReservations()` ends reservations and keeps the lock; nothing reopens them, so one store serves one season. The cost, accepted at S124: a career's pages (`people`, `player`, `gamelog`, `box`, `day`) refuse while that career's season is being played in another window.
 
-**Never a fallback.** If the file cannot be made durable — read-only folder, full disk, another process holding the lock — no identities are issued at all and the run stops. An in-memory fallback would produce a season whose numbers exist nowhere. Durability is claimed against ordinary process failure and normal atomic filesystem behaviour; not against a machine losing power mid-write.
+**Never a fallback.** If the counters cannot be published — read-only folder, full disk — the season is not published and is played again next run; another process holding the lock refuses the run before anything plays. Durability is claimed against ordinary process failure and normal atomic filesystem behaviour; not against a machine losing power mid-write.
 
 ### Where numbers are issued, and in what order
 
@@ -9885,9 +9885,9 @@ Arithmetic is checked and half-open: `start = next`, `end = next + n`, persist `
 | season | `BuildSeasonSchedule`, **after** the slate validates | one |
 | game | same place, same write | one block of 5,205 |
 
-The schedule is built identity-free first and validated, and only then numbered — a schedule that fails to build must not already have spent a season number. Once reserved the numbers are durable, so a season that then fails burns them: a gap, never a retry.
+The schedule is built identity-free first and validated, and only then numbered. Since S124 a season that fails at any point before its close's publish spends nothing: it is played again with the same numbers.
 
-One reservation for the whole cohort, not one per player: 4,511 file replacements would be slow AND would leave 4,510 windows in which a crash strands a partly-numbered pool.
+One reservation for the whole cohort, not one per player: one range, all or nothing.
 
 ### The transport — a frozen bijection, not a field on the pool row
 
@@ -11197,9 +11197,10 @@ reaches a saved career and must be identical on every platform.
 4. build the conference slate                    (unchanged)
 5. date it                                       (unchanged)
 6. refuse a seated school double-booked in its window
-7. refuse a record already claiming the pending season
-8. SPEND the season and game numbers             ← the commit
-9. publish the permanent record
+7. take the season and game numbers              (held in memory, S124)
+8. build the permanent record's NotPlayed body    (in memory, S124)
+   … play …
+   the close writes the season's files, then the career file   ← the commit (S124)
 ```
 
 ★ **THE NUMBERING MOVED, AND THE ORDER IS THE CONTRACT.** The season used to take its official number the
@@ -11207,10 +11208,13 @@ instant the league slates were legal — before the calendar had been laid over 
 while nothing after the slate could refuse a season, which stopped being true here: a school seated in a
 tournament cannot also have a league game inside that window, and nothing knows what night a game is on
 until dating has run. `NumberSeasonSchedule` is now a named step, reached through a `deferNumbering` flag
-that **only the production runner sets**, so all sixteen other callers keep their pre-S97 behaviour. Past
-step 8 the season is committed and S89's rule is unchanged: the reservation is durable and a season that
-then fails burns it. A record write that fails *after* the commit does not invalidate the basketball — it
-leaves a deliberate hole in event history.
+that **only the production runner sets**, so all sixteen other callers keep their pre-S97 behaviour.
+★ **S124 moved the commit to the close.** Nothing in this pipeline writes: the numbers are held and the
+record is built in memory, and the season is committed only when its close replaces the career file, after
+every season file. A record that cannot be written fails the close by name and nothing is published (S97's
+"a write failing after the commit leaves a hole in event history" is retired with `WriteFailed`). S97's
+refusal of a record already claiming the pending season (old step 7) is retired too: such a file is set
+aside by the close.
 
 **Field seating is its own step, never folded into the schedule builder.** That is what keeps "the league
 schedule is a pure function of the world" true — the two cross-seed tripwires still pass untouched, and
@@ -11238,9 +11242,10 @@ truth — a school, place or event that no longer exists simply never matches a 
 seating layer's own membership validation doing the work. Every failure is a **hole**: missing, malformed,
 wrong career, wrong season, an older or unknown version. A hole contributes zero facts and never disables its neighbours.
 
-A pre-existing file for the pending season **refuses the schedule commit before reservation** — a stale
-record left standing is worse than a hole, because next season would read its fields as history that never
-happened. Publication itself is a no-overwrite atomic move.
+A pre-existing file for the pending season can only have been left by a close that did not finish (or put
+there by hand) — a stale record left standing is worse than a hole, because next season would read its fields
+as history that never happened. Since S124 the close **sets it aside** into `career.orphans/` before it
+writes (S97 refused the season instead). Publication itself is a no-overwrite atomic move.
 
 ### The stock pool
 
@@ -11400,7 +11405,8 @@ says so.
 ### GameIds — reserved up front, because the lock shuts before a game plays
 
 **Forced, not preferred.** `CloseReservations()` runs before the first tip, so nothing can reserve an id once
-play begins. Every tournament id is therefore spent at the S97 commit alongside the conference block.
+play begins. Every tournament id is therefore taken at the S97 numbering alongside the conference block (held
+in memory until the close publishes it, S124).
 
 The pairings are unknown then; the COUNT is not — twelve per active complete eight-field, four per active
 complete four-field, zero for a dormant or short event. So the reservation table is keyed by bracket
@@ -11434,39 +11440,32 @@ deterministic, never read as a venue.
 **Legacy mode plays its tournaments too.** With no career attached the fixtures simply stay unnumbered,
 exactly as legacy conference fixtures always have. Basketball does not require a save file.
 
-### The record — replaced, never rebuilt
+### The record — finished from the set-up's body, never rebuilt
 
-S98 atomically replaces `<history>.events/season-N.json` with `playStatus: "Completed"` and a populated
-`finishBySeat`. **The file on disk is the authority for who was in the tournament** — the replacement reads
-it, validates it, and writes it back with the finishes filled in. It never re-seats from the current world,
-because a world edited between the commit and now would silently rewrite history.
+`<history>.events/season-N.json` carries `playStatus: "Completed"` and a populated `finishBySeat` for every
+event that played. **The NotPlayed body the set-up built is the authority for who was in the tournament** — the
+finalizer (`MteFinalRecordBytes`, pure) validates it and re-emits it with the finishes filled in. It never
+re-seats from the current world, because a world edited between the set-up and the close would silently rewrite
+history. ★ **S124 — written once.** Until S124 the NotPlayed record was published at the commit and replaced on
+disk at the close; now the body is held in memory and the close writes the final record once (the NotPlayed body
+itself when no event played — what the file always ended up as), byte for byte the S98 file.
 
-Validated before a byte is written: the format version, the career it belongs to, the season it names, that
-every event still says `NotPlayed`, that no finishes are already present, and that the seats on disk are the
+Validated before anything is produced: the format version, the career it belongs to, the season it names, that
+every event still says `NotPlayed`, that no finishes are already present, and that the seats in the record are the
 seats the games were actually played between (compared as a whole map, so a swapped pair is caught as readily
-as a missing one). **Rerunning a completed season is not reachable and nothing is built for it** — a
-career-bound season always reserves a NEW id and S97's collision precheck refuses before spending anything —
-so the `Completed` guard is a corruption tripwire, not a lifecycle branch.
+as a missing one). **Rerunning a completed season is not reachable and nothing is built for it**, so the
+`Completed` guard is a corruption tripwire, not a lifecycle branch.
 
 `finishBySeat` is an **array of seat/place pairs ordered by seat**, matching how the seats themselves are
 written, and it is addressed by the S97 SEAT — never by seed and never by school.
 
-★ **THE ORDER, EXPLICITLY.** The replacement cannot be the last write *and* have its failure reported on the
-page; both cannot hold. The resolution:
-
-```
-S97 publishes the NotPlayed record at the commit, before any game runs   (unchanged)
-play every game
-attempt the atomic replacement
-carry success or failure out on the run result
-print the page                                            <- the last thing that happens
-```
-
-A failed replacement leaves the `NotPlayed` record **byte-identical**, the season valid and played, the page
-saying the finishes could not be persisted, and **no retry inside the run** — the same deliberate hole S97
-already models. The replacement takes an **injected rename delegate** so a check can force that failure
-without reaching for file permissions, an invalid path or OS locking, every one of which would prove
-something about the filesystem rather than about the method.
+★ **THE ORDER (S124).** The record is written by the close, after the log and the scouting file and before the
+career file. A record that cannot be written **fails the close by name** and nothing is published; the season is
+played again next run. (S98's "a failed replacement leaves a deliberate hole and the page says so" is retired
+with `EventRecordStatus.WriteFailed` and both page lines.) The writer (`MteWriteRecord`: a whole temp file, then a
+no-overwrite move) takes an **injected publish delegate** so a check can force a failure at the rename without
+reaching for file permissions, an invalid path or OS locking, every one of which would prove something about the
+filesystem rather than about the method.
 
 ### The page
 
@@ -12482,7 +12481,7 @@ The archive format deliberately knows nothing about this league (GameLogReader's
 ### Identity across the turnover
 
 - A **returner keeps the number he was written with.** The turnover preserves exactly one object per man — his `Player` — and `with`-clones carry it by reference, so the number is found through it. Matched in every check **by person number, never by name.**
-- **Freshmen are numbered in one reservation**, durable before a number is handed out (S89), at the draft site under the lock, in generation order — which is their order in the season-two pool. The counter moves by exactly the class size; a departed senior's number is gone from the roster section and is never reissued (Phase 105 C3).
+- **Freshmen are numbered in one reservation** (S89; held in memory and published with the season's close since S124), at the draft site under the lock, in generation order — which is their order in the season-two pool. The counter moves by exactly the class size; a departed senior's number is gone from the roster section and is never reissued (Phase 105 C3).
 - **A freshman is named `Pool_s<season>_<k>`** — the season he arrived in and his place in the class. The prompt wrote `Pool_p<number>`; the number is walled off from the harness by design (S89's seam) and a label is no reason to open it. Unique against every returner and every past season by construction; the stacked command keeps S114's `Pool_<P+k>`.
 
 ### Everything refuses before a number is spent
@@ -12683,8 +12682,9 @@ same-object contracts (`ValidateTurnover`, the identity lookup) run untouched on
 
 `season-N.scout` beside `season-N.log`: that season's people only, each by his number — the tier of each funded
 attribute, work ethic, arrival IQ and Discipline, the development seed, hidden progress and each attribute's streak.
-Text with a SHA-256, every double as its raw bits. Written whole once (write-then-rename) when the season's people are
-fixed; an existing file is never overwritten. Season N+1 reads season N's log **and** season N's scouting file, found
+Text with a SHA-256, every double as its raw bits. Written whole once (write-then-rename) — since S124 at the season's
+close, after the log and before the event record; the state it holds is fixed at the set-up and untouched by play. An
+existing file is never overwritten. Season N+1 reads season N's log **and** season N's scouting file, found
 by the same arithmetic. Missing, damaged, an older version, another career's, another world's or another season's —
 refused by name at step 1, before a number is spent, and **never re-rolled** (that would hand every player new
 potential). A career saved before S121 has none, and is refused at its next season by the standing C-60 sentence.
@@ -12708,15 +12708,17 @@ three-camp career a man is funded in 5–8 distinct attributes. Shooter with ver
 Outside 52 → 64 / 72 / 82 (10th / 50th / 90th); a monster athlete's low-potential finishing 40 → 44 / 46 / 59 when
 you fund it, 38 / 39 / 40 when the computer chases his athleticism instead.
 
-## The season on the calendar (Sessions 122–123, 2026-10-10/12)
+## The season on the calendar (Sessions 122–124, 2026-10-10/12)
 
 ★ **C-67 — the calendar runs the game** (Emmett: *"in general a calendar needs to be the background organization
 that runs the whole game. It should be July 8, 1987 or whatever and offseason recruiting, or whatever ends up going
 on then, is happening."*). The arc in three steps: (1) the season played on the calendar, day by day (S122);
 (2) the calendar runs the year — offseason events on their dates — with save anywhere, reload anywhere and the sim
 buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135). Step 2's save work runs
-in five phases (★ **C-68**): A, the season that can stop (S123, below); B1, safe saves; B2, resuming mid-season; B3,
-fresh dice, autosave and the sim commands; C, prestige read from the league state.
+in five phases (★ **C-68**): A, the season that can stop (S123, below); B1, safe saves — split by Emmett (2026-10-12)
+into B1a, nothing written until the season closes (S124, below), B1b, the career file becomes trustworthy, and B1c,
+nothing reads a file the career does not list; B2, resuming mid-season; B3, fresh dice, autosave and the sim commands;
+C, prestige read from the league state.
 
 ### One day at a time
 
@@ -12789,17 +12791,17 @@ game already played never changes; the days after a save re-roll on every load. 
 A season is an object (`SeasonRun`, `Program.Season.Run.cs`):
 
 ```
-run = SeasonBegin(world, seed, configPath, verbose, options)   // the set-up, and every write it makes
+run = SeasonBegin(world, seed, configPath, verbose, options)   // the set-up; writes nothing (S124)
 run.AdvanceThrough(2026-12-15)                                 // plays every day not yet played, through that day
 run.AdvanceThrough(2027-01-03)                                 // writes nothing
 run.AdvanceThrough(run.LastLegalDay)
-outcome = run.Finish()                                         // the close, and every write it makes
+outcome = run.Finish()                                         // the close, and every write the season makes
 ```
 
 `RunSeasonCore` is exactly that, in one call, with its old signature, so every caller is unchanged; `SeasonPlayCalendar`
 is the same over `SeasonCalendarRun`. The set-up, the game and the close are the S122 code moved: every value the game
 or the close reads from the set-up is a field named as the local it was. **Nothing about the basketball and nothing on
-disk changed** — not a byte, not the moment of a write.
+disk changed** at S123 — not a byte, not the moment of a write. (S124 then moved every write to the close; below.)
 
 ★ **The contract.** `NextDay` is the first day not yet played. `AdvanceThrough(day)` plays every day from `NextDay`
 through `day`, empty days included; the day already played through is a no-op; earlier is refused (backwards); past
@@ -12812,17 +12814,17 @@ first such call plays every game in ordinal order, a later one is the no-op, any
 
 ★ **The lifecycle.** A precondition refusal is raised before anything plays and leaves the run usable. Any exception
 while playing or closing **faults** the run: the original propagates, and every later call is refused naming the day it
-failed on. A faulted run is never retried in memory — nothing proves a half-played day safe to resume. `Dispose`
-releases the season log's file and lock (closing, deleting nothing) and never touches the career store, which belongs
-to the caller. An abandoned or faulted run leaves exactly what a crash left before S123 — the unfinished log with its
-roster, the event record, the scouting file, the numbers spent; repairing that is B1's.
+failed on. A faulted run is never retried in memory — nothing proves a half-played day safe to resume. The run holds no
+file during play (S124: the season log's writer lives only inside the close), and it never touches the career store,
+which belongs to the caller — the career lock is released when the caller disposes the store. An abandoned or faulted
+run leaves the career folder exactly as it was before the season.
 
 ★ **The state inventory (Q1: store everything).** Phase 114's frozen list names every field of the season run, the
 walk and the five game sources — 105 — by name, declared type and one of five categories: mutable simulation data
 (persist and restore exactly), immutable set-up data (persist, or rebuild from verified inputs), derived values
 (recompute only where equivalence is proven), shared references (restore the relationship — `resultSlots` is the
 same list every conference tournament reads, and the walk holds the same source objects as the run), and resources and
-callbacks (the log writer, the play step, the month line — recreate or rebind, never data). A field added or removed
+callbacks (the play step, the month line, the close's test seam — recreate or rebind, never data). A field added or removed
 without the list fails the suite. **It is a top-level list:** it does not see inside the stats accumulator (one entry),
 behind a reference, or into a callback. The save's completeness is B2's to prove — a snapshot restored in a fresh
 process finishing identical to an uninterrupted season.
@@ -12831,12 +12833,83 @@ process finishing identical to an uninterrupted season.
 seasons, the legacy stock season, a fixture-mte career season: every game, count, fingerprint, event, tournament and
 buy game, every file byte for byte, the page's month lines; a control drops one piece of live state between chunks and
 is named. The contract's refusals each by name, each leaving the run usable; a constructed fault on the walk and in a
-real career; `Dispose` in every state. The inventory against the classes, both directions, two controls. And the
-career folder at every stage: after the set-up, the six files the S122 build had written before its first tip (the
-career file and event record pinned from that build; the scouting file and the unfinished log — raw decimal bits, so
-never pinned from a Linux capture — proven against the same machine's one-call season, the log its exact front); after
-every advance, unchanged, the lock held; after the close, the one-call season's, the lock released. Files written by a
-live writer are read allowing writers (Windows refuses otherwise), and the one-byte control runs on a copy.
+real career (the career lock held through it, freed with the store); `Dispose` in every state. The inventory against
+the classes, both directions, two controls. And the career folder at every stage (rewritten at S124): after the set-up
+and after every advance, exactly the folder from before the season — the career file and its lock — with the career
+lock held; after the close, the one-call season's, the career file the S122 capture, now written by the close. Files
+are read allowing writers (Windows refuses otherwise), and the one-byte control runs on a copy.
+
+### A season leaves no trace until it closes (S124 — save design, phase B1a)
+
+★ **The bug it ends.** Until S124 a career season wrote to disk before its first tip — the career file's numbers, the
+event record as NotPlayed, the scouting file, the start of the season log — so a season stopped by a crash, a closed
+window, Ctrl+C or a power cut ended the career: the next run found the numbers spent and the files half-made, and
+refused. Now **nothing is written until the season closes, and the career file is written last.**
+
+```
+SeasonBegin       holds the numbers in memory; builds the record's NotPlayed body and the log's roster in memory
+AdvanceThrough    writes nothing
+Finish            checks everything in memory first (every log block, the record's finishes, every game placed,
+                  the outcome built), then:
+                    1  set aside any file of this season or later        CareerSetAsideUnfinished
+                    2  the log (when the season keeps one)               Create, every block, Finalize
+                    3  the scouting file (when the season has hidden state)
+                    4  the event record, written once                    MteWriteRecord
+                    5  the career file's counters                        PublishReservations   ← the commit
+```
+
+★ **The commit boundary.** The publish is the last step that can fail. Once the career file has been replaced the season
+is committed — the counters on disk are the only thing that says a season happened, and the next run reads them, not
+this run's exception. An exception from the publish means the career file was not replaced (a temp file, then one
+rename). So:
+
+- **stopped while it plays** → the career is exactly as it was; the next run plays the same season from November 1, and
+  in fixed dice it comes out identical;
+- **stopped while it closes, before step 5** → some of the season's files are on disk but the career file says the season
+  never happened; the next run's close sets them aside and writes fresh ones;
+- **stopped after step 5** → a committed season; the next run plays the season after and sets nothing aside.
+
+★ **The set-aside — a temporary v3 recovery rule.** The close's first step moves every recognised file of a season ≥ the
+pending one into `career.orphans/` (named for the history file, like `.events` and `.gamelog`), keeping its relative
+path, with `.1`, `.2` … on a name already taken. Recognised means exactly four kinds, canonical names only:
+`career.events/season-N.json`, `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`. The rule is
+exact for v3, not a heuristic: the counters are published last and one writer holds the lock, so such a file was written
+by a close that did not finish, or placed by hand — and no reader can reach it, because every reader computes the path
+of an EARLIER season and none lists a folder. Two invariants that carry into B1c: **a set-aside file is never deleted or
+changed** (moved, byte for byte), and **nothing but the four kinds is moved** — lock sidecars (reused by design, S90),
+temp files and anything else stay exactly where they are. A file that cannot be moved **refuses the close by name**, with
+nothing published. A run that set something aside prints one line saying what; otherwise the page is unchanged. **It is
+transitional:** it infers ownership from names and counters; B1c replaces the inference with the career's own file list
+and retires it.
+
+★ **Refusals print, they do not crash.** The close's two new refusals — a file that cannot be set aside, a record that
+cannot be written — are raised as errors the `season` command prints as `SEASON ERROR`, so a disk failure at the close is
+a named line. The command exits 0 either way, which is why Phase 115 judges a child run by its output and the career's
+counters, never by its exit code. (A scouting file that cannot be written still escapes as a raw exception, as it did at
+the set-up — O-136.)
+
+★ **One store, one season.** `CloseReservations()` sets a flag nothing clears, and a reservation after it is refused, so a
+season whose close failed cannot be followed by another on the same open store; its held numbers die with the store.
+
+★ **The test seam.** `SeasonRunOptions.CloseStepForTest` is called with a step name before each close step (`set-aside`,
+`log`, `log-open` — after the log is created, before its blocks — `scouting`, `record`, `counters`) and just after the
+publish (`published`). A check throws from it to stop the close there. Null on every production path; nothing in
+production reads it.
+
+### How Phase 115 proves it
+
+On fixture-mte under the fixed history id. **Nothing before the close:** after the set-up, every advance and a run
+disposed unfinished, the folder is byte-identical to before the season; the career lock held through play. **The
+interruptions, each re-run by the `season` command in a fresh process** (the child launched from the running harness;
+the check's own store disposed first so the child can take the lock): mid-season and at each close step, the career file
+is byte-identical afterwards, and after the re-run every file outside `career.orphans/` equals an uninterrupted career's
+byte for byte, `career.orphans/` holding exactly what the unfinished close had written; at `published`, a committed season
+that the next season builds on identically; a first season on each side of play. A child counts as complete only if it
+exits 0, prints no `SEASON ERROR`, advanced the counters to exactly the reference's and wrote the season's three files —
+and a child whose close is blocked is shown to fail that verdict. **No number published twice** across all nine careers.
+**The set-aside** of the four kinds at and past the pending season, byte-untouched; earlier seasons and unrecognised files
+never touched; a blocked `career.orphans` refusing by name with nothing published. **The close's order**, observed at
+every step, with a one-byte control.
 
 ### How Phase 113 proves it
 

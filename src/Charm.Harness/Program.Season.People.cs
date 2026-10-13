@@ -216,7 +216,7 @@ internal static partial class Program
                             k => string.Create(CultureInfo.InvariantCulture, $"Pool_s{pendingSeasonId}_{k}"));
         var pool2 = t.SeasonTwo.Pool;
 
-        // ★ ONE reservation for the whole class, durable before a number is handed out (S89).
+        // ★ ONE reservation for the whole class (S89). ★ S124 — held in memory; published at the close.
         var issued = history.ReservePersons(t.Freshmen.Count);
 
         var keptId = new Dictionary<Player, PersonId>(ReferenceEqualityComparer.Instance);

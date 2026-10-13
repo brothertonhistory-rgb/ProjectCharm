@@ -1,0 +1,419 @@
+﻿=== Project Charm :: Season (Pass 2: minimal season loop) ===
+World: worlds\stock-d1.world.json (347 schools, 32 conferences)
+Season seed: 20260720
+Schedule: 2818 games ΓÇö conference play only. Each team plays its own league's number (14ΓÇô20), exactly half of them at home. 14 school(s) sit in a league authored at zero games and play none.
+  General non-conference scheduling does not exist yet ΓÇö it is its own session. Every game on the conference slate is a real home game; the early-season tournaments play on neutral floors and are counted after it.
+
+Regenerating divvied rosters (world + seed; nothing persisted) and playing 2818 real engine games ...
+People: first season ΓÇö the bootstrap pool
+  ... November: 1,309 games
+  ... December: 720 games
+  ... January: 1,474 games
+  ... February: 1,210 games
+  ... March: 644 games
+
+Conference schedule fingerprint: 6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3
+Tournament games fingerprint: 734f274710d202d9239beb5d0e01f5502a3ae96c287b5caa1e57bac94701a064 (152 games)
+Dated: season 2026-2027, 63 December games, dated fingerprint 46d89bf88e4a33c8bc388886c179cc0bf4e4bba0fe5674748d07e2243caf646a
+Non-conference dated fingerprint: 7ace22ed8aa161c28e8af03bb2bb82b1ceb6a9b604fde1b6c35b2299094e1708 (2170 pairings)
+Cities: 5265 of 5357 played games carry a city; 92 neutral non-conference games deliberately carry none ΓÇö 310 distinct cities (4896 hosted, 461 neutral)
+Non-conference nights: 2170 dated (Nov 1169, Dec 645, Jan 347, later 9), Christmas week 0, 1 unseated
+  curve bend: allocation 69.0 quota units, seating 311 week-steps [1918/202/41/9 slid 0/1/2/3]
+  Γÿà UNSEATED 136 vs 85: SearchDefect
+Host memory: none (first season of this career)
+Schedule rotation: 0 preferred pairs held across 0 leagues (0 fell to feasibility, 0 terminal fallbacks)
+
+--- NON-CONFERENCE REQUESTS (S101: classes and targets only ΓÇö nothing is scheduled; the matching is a later session) ---
+  Classes: 83 Marquee / 70 Solid / 122 Working / 72 Selling / 14 of them Independent ΓÇö 83 lifted by their league's floor.
+  Seated in an early-season event: 108 school(s) ΓÇö a seated school plays 31 games, and its event accounts for as many as its bracket guarantees: three in a field of eight, two in a field of four. Everyone else plays 29.
+  class      n    home  neutral  road   (average requested games; road is the remainder, never a quota)
+  Marquee    83     8.5      1.6   1.5
+  Solid      70     6.0      0.8   5.0
+  Working   120     4.0      0.0   8.1
+  Selling    60     1.0      0.0  10.7
+  Balance (ordinary non-conference games to arrange): home 1773, neutral 184, road 2382 ΓÇö the country wants 609 more road games than it has willing hosts; ~304 games must be hosted by schools that wanted the road. Nowhere to land until the matching session exists.
+    Duke                  Marquee    conf 16         open 13  ->  10 home / 2 neutral / 1 road
+    Wake Forest           Marquee    conf 16         open 13  ->  9 home / 2 neutral / 2 road
+    Missouri              Marquee    conf 16         open 13  ->  8 home / 2 neutral / 3 road
+    Texas Tech            Marquee    conf 16 +event  open 13  ->  8 home / 2 neutral / 3 road
+    Drake                 Solid      conf 18 +event  open 11  ->  6 home / 1 neutral / 4 road
+    Arkansas-Pine Bluff   Selling    conf 18         open 11  ->  1 home / 0 neutral / 10 road
+    Northwestern          Marquee    conf 18 +event  open 11  ->  7 home / 2 neutral / 2 road
+    Gonzaga               Marquee    conf 14         open 15  ->  9 home / 2 neutral / 4 road
+  Independents (14) ΓÇö no conference, so the whole season is arranged here. Home reads off prestige; neutral is zero (no league to lift them); road is the remainder, so the total is a full season unless the market fails.
+    school                class     open   home  neutral   road   total
+    Houston Baptist       Selling     29      7        0     22      29
+    Winston-Salem         Selling     29      7        0     22      29
+    Longwood              Selling     29      7        0     22      29
+    NJIT                  Selling     29      7        0     22      29
+    North Carolina CentralSelling     29      7        0     22      29
+    North Dakota          Selling     29      7        0     22      29
+    Cal State Bakersfield Selling     29      7        0     22      29
+    SIU Edwardsville      Selling     29      7        0     22      29
+    Chicago State         Selling     29      8        0     21      29
+    Savannah State        Selling     29      8        0     21      29
+    Texas-Pan American    Selling     29      8        0     21      29
+    Utah Valley           Selling     29      9        0     20      29
+    South Dakota          Working     29      9        0     20      29
+    Seattle               Working     29     10        0     19      29
+
+--- NON-CONFERENCE MATCHING (S102: every November in the country pairs ΓÇö who plays whom and who hosts; no site and no night until the next session) ---
+  2171 games paired: 1773 at a host's gym, 92 neutral, 87 filled by the bottom hosting the bottom, 3 terminal repairs.
+  0 home requests settled for a better opponent than they asked for; 0 neutral game(s) found no partner and became an ordinary home game.
+  344 school(s) land exactly on their target; 3 play one game more than they asked for (Cal Poly, Grambling State, Southern); 0 request(s) found nobody at all.
+  The visitor's trip: median 155 mi, p90 475 mi over 1776 game(s); the bottom-hosts-bottom games run 317 mi at the median over 87.
+  road trips taken, by the travelling school's class (the geographic tilt ΓÇö measured, never asserted):
+    Marquee   108 trip(s)   median   205 mi   p90    472 mi
+    Solid     325 trip(s)   median   164 mi   p90    480 mi
+    Working   786 trip(s)   median   157 mi   p90    578 mi
+    Selling   860 trip(s)   median   170 mi   p90    568 mi
+  Γÿà power-conference schools with NO true road game: 24 of 73 ΓÇö the number this matching is judged by:
+      Arizona                 9 home, 1 neutral, 0 filler-hosted ΓÇö never a true road game
+      California              9 home, 0 neutral, 0 filler-hosted ΓÇö never a true road game
+      Cincinnati              9 home, 2 neutral, 0 filler-hosted ΓÇö never a true road game
+      ΓÇª and 21 more.
+  the named schools' Novembers (opponents grouped by kind, then by id):
+    Duke (Marquee) ΓÇö home: Campbell, Charlotte, Duquesne, East Carolina, Elon, High Point, Marshall, North Carolina A&T, Youngstown State, North Carolina Central | neutral: Kansas, Michigan State | road: Winston-Salem
+    Wake Forest (Marquee) ΓÇö home: Campbell, Charlotte, Duquesne, East Carolina, Elon, High Point, North Carolina A&T, Winston-Salem, North Carolina Central | neutral: Notre Dame, Vanderbilt | road: Savannah State
+    Missouri (Marquee) ΓÇö home: Centenary, Drake, Illinois-Chicago, Louisiana-Monroe, Saint Louis, Southeast Missouri State, SIU Edwardsville, South Dakota State | neutral: Alabama, UAB | road: Eastern Illinois, Northern Iowa, Missouri State
+    Texas Tech (Marquee) ΓÇö home: New Mexico, Prairie View A&M, Southern Methodist, Texas State, Texas Christian, Texas Southern, Houston Baptist, Northern Colorado | neutral: Louisiana State, Seton Hall | road: Air Force, New Mexico State, Texas-Pan American
+    Drake (Solid) ΓÇö home: Grambling State, Iowa State, Mississippi Valley State, South Dakota, North Dakota State, North Dakota | neutral: Hawaii | road: Kansas, Kansas State, Minnesota, Missouri
+    Arkansas-Pine Bluff (Selling) ΓÇö home: Arkansas-Little Rock | road: Arkansas, Kansas State, Memphis, Mississippi, Oklahoma, Oklahoma State, Saint Louis, Missouri State, Tulsa, Wichita State
+    Northwestern (Marquee) ΓÇö home: Bradley, Chicago State, Detroit, Tennessee State, Tennessee-Martin, Western Michigan, SIU Edwardsville | neutral: Boise State, Rutgers | road: Iowa State, Marquette
+    Gonzaga (Marquee) ΓÇö home: Utah Valley, Eastern Washington, Idaho, Idaho State, Sacramento State, Southern Utah, Washington State, UC Davis, Northern Colorado | neutral: Oklahoma, Oklahoma State | road: Montana State, Portland State
+  bottom hosts bottom ΓÇö all 87 of them, by host (both schools wanted the road; the lower school eats the home game):
+    Alabama State              hosts Vanderbilt                    263 mi
+    Albany                     hosts Central Connecticut State      85 mi
+    Albany                     hosts Fairfield                     105 mi
+    Albany                     hosts Massachusetts                  67 mi
+    Bethune-Cookman            hosts Georgia Southern              228 mi
+    Boston University          hosts Cal State Northridge         2599 mi
+    Brown                      hosts American                      356 mi
+    Brown                      hosts Binghamton                    231 mi
+    Brown                      hosts Bucknell                      290 mi
+    Brown                      hosts Delaware State                284 mi
+    Bucknell                   hosts Pennsylvania                  113 mi
+    Bucknell                   hosts St. Bonaventure               113 mi
+    Buffalo                    hosts Vermont                       302 mi
+    Cal State Fullerton        hosts San Diego State                88 mi
+    Central Michigan           hosts Dayton                        267 mi
+    Charleston Southern        hosts UNC Wilmington                155 mi
+    Cornell                    hosts Holy Cross                    240 mi
+    Cornell                    hosts Stephen F. Austin            1245 mi
+    Dartmouth                  hosts Northeastern                  113 mi
+    Dartmouth                  hosts Rhode Island                  158 mi
+    Florida Atlantic           hosts Georgia Southern              432 mi
+    Florida International      hosts College of Charleston         484 mi
+    Hawaii                     hosts Vermont                      4941 mi
+    Lafayette                  hosts Delaware                       75 mi
+    Lafayette                  hosts Manhattan                      71 mi
+    Lafayette                  hosts Marist                         97 mi
+    Lafayette                  hosts Monmouth                       69 mi
+    Lamar                      hosts Baylor                        206 mi
+    Lehigh                     hosts Drexel                         45 mi
+    Lehigh                     hosts Saint Joseph's                 45 mi
+    Lehigh                     hosts Wagner                         77 mi
+    Maine                      hosts Boston College                217 mi
+    Maine                      hosts Fairfield                     346 mi
+    Maine                      hosts Marist                        344 mi
+    McNeese State              hosts Houston                       134 mi
+    Montana State              hosts Washington State              301 mi
+    Montana State              hosts Wyoming                       407 mi
+    Savannah State             hosts Appalachian State             290 mi
+    Savannah State             hosts North Carolina State          296 mi
+    Savannah State             hosts Radford                       353 mi
+    Savannah State             hosts Samford                       349 mi
+    Savannah State             hosts Stetson                       208 mi
+    Savannah State             hosts Tennessee                     317 mi
+    Savannah State             hosts UNC Greensboro                288 mi
+    Savannah State             hosts Wofford                       207 mi
+    New Hampshire              hosts Central Connecticut State     139 mi
+    Portland                   hosts Weber State                   612 mi
+    Portland State             hosts San Francisco                 536 mi
+    Portland State             hosts Santa Clara                   566 mi
+    Radford                    hosts Ohio                          173 mi
+    South Carolina State       hosts Samford                       343 mi
+    St. Peter's                hosts Lafayette                      60 mi
+    Stephen F. Austin          hosts Cal State Northridge         1394 mi
+    Texas A&M-CC               hosts New Mexico                    744 mi
+    Texas A&M-CC               hosts New Mexico State              643 mi
+    Texas A&M-CC               hosts Northern Arizona              983 mi
+    Texas-San Antonio          hosts Kansas State                  682 mi
+    Texas-San Antonio          hosts Murray State                  769 mi
+    Texas-San Antonio          hosts Samford                       744 mi
+    Citadel                    hosts Jacksonville                  197 mi
+    UC Irvine                  hosts Montana                       932 mi
+    UMBC                       hosts Delaware State                 59 mi
+    UMBC                       hosts George Mason                   48 mi
+    William & Mary             hosts Princeton                     240 mi
+    Florida Gulf Coast         hosts Florida State                 301 mi
+    South Dakota               hosts Akron                         800 mi
+    South Dakota               hosts Colorado                      472 mi
+    South Dakota               hosts Minnesota                     236 mi
+    South Dakota               hosts New Mexico                    742 mi
+    South Dakota               hosts Ohio                          807 mi
+    South Dakota               hosts Stephen F. Austin             782 mi
+    South Dakota               hosts Tennessee Tech                761 mi
+    South Dakota               hosts Texas-Arlington               696 mi
+    South Dakota               hosts Weber State                   778 mi
+    Seattle                    hosts Buffalo                      2111 mi
+    Seattle                    hosts Cornell                      2233 mi
+    Seattle                    hosts Holy Cross                   2454 mi
+    Seattle                    hosts Old Dominion                 2430 mi
+    Seattle                    hosts Pacific                       669 mi
+    Seattle                    hosts Pepperdine                    958 mi
+    Seattle                    hosts Sam Houston State            1834 mi
+    Seattle                    hosts Stephen F. Austin            1826 mi
+    Seattle                    hosts Toledo                       1928 mi
+    Seattle                    hosts Vermont                      2325 mi
+    Seattle                    hosts Wyoming                       931 mi
+    Seattle                    hosts North Dakota State           1193 mi
+    North Carolina Central     hosts Norfolk State                 160 mi
+
+--- EARLY-SEASON EVENTS (played out to a full placement; neutral floors, nobody hosts) ---
+  Maui Invitational (tier 1, Lahaina, 11-24..11-26): 1. Purdue, 2. Mississippi State, 3. Texas, 4. Wichita State, 5. Old Dominion, 6. Miami-Ohio, 7. Pittsburgh, 8. College of Charleston
+  Battle 4 Atlantis (tier 1, Nassau, 11-25..11-27): 1. Dayton, 2. Oregon, 3. Villanova, 4. Niagara, 5. Kentucky, 6. Baylor, 7. Missouri State, 8. Kent State
+  Champions Classic (showcase, national, Indianapolis, 11-12): headliner Wisconsin 74-70 Kentucky; undercard Louisville 65-61 Texas
+  Jimmy V Classic (showcase, national, New York, 12-03): headliner Syracuse 80-68 Mississippi State; undercard Kent State 60-64 Stanford
+  Vegas Invitational (tier 2, Las Vegas, 11-27..11-29): 1. Texas A&M, 2. Clemson, 3. Syracuse, 4. Southern California, 5. Milwaukee, 6. Auburn, 7. Boise State, 8. Pacific
+  Legends Classic (tier 2, Brooklyn, 11-20..11-22): 1. VCU, 2. Arkansas, 3. Weber State, 4. Vermont, 5. Utah, 6. Nebraska, 7. Illinois State, 8. Georgetown
+  CBS Sports Classic (showcase, national, Atlanta, 12-05): headliner Connecticut 75-60 Florida; undercard Butler 71-74 California
+  Cayman Islands Classic (tier 3, George Town, 11-23..11-25): 1. California, 2. Seton Hall, 3. George Washington, 4. Virginia Tech, 5. Davidson, 6. Marshall, 7. Nevada, 8. Middle Tennessee
+  ESPN Events Invitational (tier 3, Orlando, 11-26..11-27): 1. Western Kentucky, 2. Penn State, 3. Northern Iowa, 4. Notre Dame
+  Lone Star Shootout (showcase, 900mi, Dallas, 12-04): headliner Marquette 57-59 Arizona; undercard Georgia 56-81 Georgia Tech
+  Sunset Showdown (showcase, 900mi, Los Angeles, 11-22): headliner Brigham Young 73-78 UCLA; undercard UTEP 68-61 New Mexico State
+  Paradise Jam (tier 4, Charlotte Amalie, 11-20..11-21): 1. Iowa, 2. Miami, 3. Hawaii, 4. Belmont
+  Puerto Rico Tip-Off (tier 4, San Juan, 11-19..11-20): 1. Illinois-Chicago, 2. New Mexico State, 3. Indiana, 4. Houston
+  Hall of Fame Series (tier 4, Uncasville, 11-21..11-22): 1. Drake, 2. Georgia Tech, 3. Colorado, 4. Chattanooga
+  Wooden Legacy (tier 4, Anaheim, 11-27..11-28): 1. St. John's, 2. South Carolina, 3. Akron, 4. Oral Roberts
+  Baha Mar Hoops (tier 4, Freeport, 11-23..11-24): 1. Drexel, 2. Texas Tech, 3. Massachusetts, 4. Green Bay
+  Desert Classic (tier 4, Phoenix, 11-26..11-27): 1. Louisiana State, 2. Bradley, 3. Saint Mary's, 4. Rutgers
+  Crossroads Classic (showcase, 500mi, Indianapolis, 12-06): headliner Virginia 56-66 Purdue; undercard Bradley 61-59 Saint Louis
+  Holiday Festival (showcase, 500mi, New York, 12-01): headliner VCU 70-63 West Virginia; undercard Siena 72-66 North Carolina State
+  Cancun Challenge (tier 5, Canc├║n, 11-24..11-25): 1. Troy, 2. Boston University, 3. Hofstra, 4. Fairfield
+  Jamaica Classic (tier 5, Montego Bay, 11-20..11-21): 1. Rider, 2. Appalachian State, 3. UL-Lafayette, 4. Southern Mississippi
+  Fort Myers Tip-Off (tier 5, Fort Myers, 11-23..11-24): 1. Stephen F. Austin, 2. Iona, 3. DePaul, 4. Central Florida
+  Myrtle Beach Invitational (tier 5, Myrtle Beach, 11-19..11-20): 1. Indiana State, 2. Rhode Island, 3. Tulane, 4. Northwestern
+  Asheville Championship (tier 5, Asheville, 11-21..11-22): 1. Cornell, 2. Oakland, 3. Austin Peay, 4. Ohio
+  Hall of Fame Tip-Off (tier 5, Hartford, 11-14..11-15): 1. Santa Clara, 2. Valparaiso, 3. Northeastern, 4. Fresno State
+  Music City Showcase (showcase, 400mi, Nashville, 11-21): headliner Clemson 60-55 Charlotte; undercard DePaul 62-74 Murray State
+  Queen City Clash (showcase, 400mi, Charlotte, 11-30): headliner George Mason 60-47 Western Kentucky; undercard Austin Peay 61-50 Ohio
+  Emerald Coast Classic (tier 6, Niceville, 11-27..11-28): 1. Cleveland State, 2. Georgia Southern, 3. Morehead State, 4. South Carolina State
+  Sanford Pentagon Showcase (tier 6, Sioux Falls, 11-20..11-21): 1. Colorado State, 2. Fordham, 3. Montana, 4. Wagner
+  Gateway Classic (showcase, 400mi, St. Louis, 11-28): headliner Miami-Ohio 67-88 Iowa; undercard IUPUI 56-42 Illinois-Chicago
+  River City Rumble (showcase, 350mi, Louisville, 11-25): headliner Belmont 73-55 Illinois State; undercard Western Michigan 56-68 Oakland
+  Naples Invitational (tier 7, Naples, 11-25..11-26): 1. Texas Southern, 2. Florida International, 3. Liberty, 4. Campbell
+  Bayou Showcase (tier 7, Lake Charles, 11-19..11-20): 1. Hartford, 2. Centenary, 3. VMI, 4. Loyola Marymount
+  Steel City Showcase (showcase, 300mi, Pittsburgh, 12-02): headliner Penn State 66-62 Rutgers; undercard Pennsylvania 50-58 Robert Morris
+  Dormant this season: Palmetto Classic, Gulf Coast Showcase, Sunshine Slam, Border Classic, Veterans Classic, Great Alaska Shootout, Grand Rapids Classic, Hoophall Showcase, Heartland Showcase, Harbor Classic, Delta Classic
+
+Home court: road shave 3 ΓÇö home wins 3190/4896 = 65.2%, margin +7.3 (461 neutral-floor games excluded)
+
+History: C:\Users\ootpe\AppData\Local\Temp\s124-career.json
+World fingerprint: sha256-v1:2681072d8dd75e520253acb630181764596a1399e080aa07b370debb9b8394dc
+
+--- STANDINGS (all 347, ranked by WIN PCT; ties broken by school id; a school that played nothing sorts last) ---
+  rk   school                    conf       pres   W-L     pct
+  1    VCU (VACM)                CAA          70   34-0    100.0
+  2    Utah State (UTST)         WAC          83   29-3    90.6
+  3    Oakland (OAK)             Summit       48   29-5    85.3
+  4    Milwaukee (MILW)          Horizon League   61   29-5    85.3
+  5    Jacksonville (JK)         Atlantic Sun   36   26-5    83.9
+  6    UAB (UAB)                 Conference USA   77   26-5    83.9
+  7    New Mexico (NM)           Mountain West   71   25-5    83.3
+  8    Bowling Green (BLGRN)     MAC          45   25-6    80.6
+  9    Ohio State (OH ST)        Big Ten      88   24-6    80.0
+  10   Clemson (CLMSN)           ACC          75   27-7    79.4
+  11   Alabama State (ALST)      SWAC         26   25-7    78.1
+  12   American (AMER)           Patriot League   42   25-7    78.1
+  13   Stephen F. Austin (SFA)   Southland    41   25-7    78.1
+  14   Washington (WASH)         Pacific-10   73   25-7    78.1
+  15   Memphis (MMPHS)           Conference USA   87   24-7    77.4
+  16   Connecticut (UCONN)       Big East     90   23-7    76.7
+  17   Louisville (LSVLE)        Big East     88   23-7    76.7
+  18   Iona (IONA)               MAAC         44   26-8    76.5
+  19   Weber State (WBST)        Big Sky      50   25-8    75.8
+  20   Buffalo (BUFF)            MAC          40   24-8    75.0
+  21   Dayton (DYTN)             Atlantic 10   81   24-8    75.0
+  22   East Tennessee State (ETNST)Atlantic Sun   51   24-8    75.0
+  23   Gonzaga (GONZG)           WCC          85   24-8    75.0
+  24   Xavier (XAVR)             Atlantic 10   88   24-8    75.0
+  25   George Mason (GGMSN)      CAA          68   23-8    74.2
+  26   Illinois (IL)             Big Ten      87   23-8    74.2
+  27   Sam Houston State (SMHOU) Southland    53   23-8    74.2
+  28   Akron (AKRON)             MAC          60   25-9    73.5
+  29   Kentucky (KY)             SEC          91   25-9    73.5
+  30   Niagara (NIAGA)           MAAC         59   25-9    73.5
+  31   Texas A&M (TXAM)          Big 12       72   25-9    73.5
+  32   Villanova (VLNV)          Big East     90   25-9    73.5
+  33   Western Kentucky (WKY)    Sun Belt     71   25-9    73.5
+  34   Oklahoma (OK)             Big 12       87   22-8    73.3
+  35   Saint Joseph's (STJOE)    Atlantic 10   75   22-8    73.3
+  36   Stanford (STAN)           Pacific-10   81   22-8    73.3
+  37   Temple (TMPL)             Atlantic 10   81   22-8    73.3
+  38   College of Charleston (CLCHA)Southern     58   24-9    72.7
+  39   Iowa (IOWA)               Big Ten      65   24-9    72.7
+  40   Vermont (VRMT)            America East   52   24-9    72.7
+  41   Brigham Young (BYU)       Mountain West   84   23-9    71.9
+  42   Georgia State (GAST)      CAA          37   23-9    71.9
+  43   San Diego State (SDGST)   Mountain West   70   23-9    71.9
+  44   Butler (BTLR)             Horizon League   82   22-9    71.0
+  45   Georgia (GA)              SEC          67   22-9    71.0
+  46   Oklahoma State (OK ST)    Big 12       87   22-9    71.0
+  47   St. Bonaventure (STBN)    Atlantic 10   41   22-9    71.0
+  48   Davidson (DAVDS)          Southern     62   24-10   70.6
+  49   Hawaii (HI)               WAC          50   24-10   70.6
+  50   Indiana (IN)              Big Ten      73   24-10   70.6
+  51   IUPUI (IUPUI)             Summit       45   21-9    70.0
+  52   Maryland (MD)             ACC          88   21-9    70.0
+  53   Western Michigan (WMCH)   MAC          47   21-9    70.0
+  54   Central Connecticut State (CNCON)Northeast    33   22-10   68.8
+  55   Georgia Southern (GASO)   Southern     33   22-10   68.8
+  56   Mercer (MRCR)             Atlantic Sun   25   22-10   68.8
+  57   Murray State (MRYST)      Ohio Valley   57   22-10   68.8
+  58   Princeton (PRNC)          Ivy League   38   22-10   68.8
+  59   Wichita State (WCST)      MVC          60   22-10   68.8
+  60   Arizona (AZ)              Pacific-10   88   21-10   67.7
+  61   Delaware (DLWR)           CAA          40   21-10   67.7
+  62   Duke (DUKE)               ACC          98   21-10   67.7
+  63   Florida (FL)              SEC          89   21-10   67.7
+  64   Holy Cross (HLYCR)        Patriot League   46   21-10   67.7
+  65   Manhattan (MNHTN)         MAAC         44   21-10   67.7
+  66   Portland State (PTLST)    Big Sky      38   21-10   67.7
+  67   Austin Peay (ASTNP)       Ohio Valley   54   23-11   67.6
+  68   Mississippi State (MS ST) SEC          83   23-11   67.6
+  69   Iowa State (IAST)         Big 12       65   20-10   66.7
+  70   North Carolina (NC)       ACC          90   20-10   66.7
+  71   Samford (SMFRD)           Southern     33   20-10   66.7
+  72   Hampton (HAMPT)           MEAC         33   21-11   65.6
+  73   Morgan State (MGNST)      MEAC         27   21-11   65.6
+  74   Purdue (PRDUE)            Big Ten      80   21-11   65.6
+  75   Robert Morris (ROBMR)     Northeast    39   21-11   65.6
+  76   Texas-San Antonio (TXSA)  Southland    32   21-11   65.6
+  77   UC Santa Barbara (UCSB)   Big West     49   21-11   65.6
+  78   Wright State (WRST)       Horizon League   58   21-11   65.6
+  79   Boston University (BOSU)  America East   43   22-12   64.7
+  80   Georgia Tech (GATC)       ACC          74   22-12   64.7
+  81   Houston (HOU)             Conference USA   63   22-12   64.7
+  82   Oregon (OR)               Pacific-10   71   22-12   64.7
+  83   Pacific (PCFC)            Big West     53   22-12   64.7
+  84   Seton Hall (STNHL)        Big East     72   22-12   64.7
+  85   Texas (TX)                Big 12       94   22-12   64.7
+  86   Arkansas (AR)             SEC          72   20-11   64.5
+  87   Creighton (CRHTN)         MVC          82   20-11   64.5
+  88   Syracuse (SYR)            Big East     92   20-11   64.5
+  89   UC Irvine (UCIR)          Big West     40   20-11   64.5
+  90   UNLV (UNLV)               Mountain West   80   20-11   64.5
+  91   Winthrop (WTHP)           Big South    47   20-11   64.5
+  92   Kansas (KS)               Big 12       97   19-11   63.3
+  93   Providence (PRVD)         Big East     69   19-11   63.3
+  94   Quinnipiac (QNNP)         Northeast    28   19-11   63.3
+  95   Virginia (VA)             ACC          71   19-11   63.3
+  96   Wofford (WFFD)            Southern     33   19-11   63.3
+  97   Binghamton (BINGH)        America East   34   20-12   62.5
+  98   California (CAL)          Pacific-10   80   20-12   62.5
+  99   Charlotte (CHRLT)         Atlantic 10   71   20-12   62.5
+  100  Chattanooga (CHATT)       Southern     44   20-12   62.5
+  101  Lamar (LAMAR)             Southland    29   20-12   62.5
+  102  South Alabama (STAL)      Sun Belt     51   20-12   62.5
+  103  UNC Greensboro (NCGN)     Southern     31   20-12   62.5
+  104  Wake Forest (WAKE)        ACC          84   18-11   62.1
+  105  West Virginia (WVU)       Big East     82   18-11   62.1
+  106  Seattle (SEA)             Independent   38   18-11   62.1
+  107  Delaware State (DLST)     MEAC         30   19-12   61.3
+  108  San Francisco (SF)        WCC          38   19-12   61.3
+  109  St. John's (STJN)         Big East     65   19-12   61.3
+  110  Morehead State (MRHDS)    Ohio Valley   35   20-13   60.6
+  111  Pittsburgh (PITT)         Big East     92   20-13   60.6
+  112  Virginia Tech (VATC)      ACC          66   20-13   60.6
+  113  Alabama (AL)              SEC          77   18-12   60.0
+  114  Arkansas-Little Rock (ARLR)Sun Belt     39   18-12   60.0
+  115  Kansas State (KS ST)      Big 12       72   18-12   60.0
+  116  Lehigh (LEHGH)            Patriot League   26   18-12   60.0
+  117  Texas-Arlington (TXAR)    Southland    33   18-12   60.0
+  118  Wisconsin (WI)            Big Ten      92   18-12   60.0
+  119  Colorado State (COST)     Mountain West   47   19-13   59.4
+  120  Louisiana State (LA ST)   SEC          71   19-13   59.4
+  121  Rhode Island (RI)         Atlantic 10   59   19-13   59.4
+  122  South Carolina (SC)       SEC          73   19-13   59.4
+  123  Southern Illinois (SNIL)  MVC          75   19-13   59.4
+  124  Richmond (RICHM)          Atlantic 10   65   17-12   58.6
+  125  Marquette (MRQT)          Big East     84   18-13   58.1
+  126  Stony Brook (STBR)        America East   21   18-13   58.1
+  127  Tennessee Tech (TNTC)     Ohio Valley   39   18-13   58.1
+  128  Cornell (CRNL)            Ivy League   40   19-14   57.6
+  129  Saint Mary's (STMRY)      WCC          59   19-14   57.6
+  130  Arizona State (AZST)      Pacific-10   70   17-13   56.7
+  131  Cal State Fullerton (CSFTN)Big West     34   17-13   56.7
+  132  Cal State Northridge (CSNTH)Big West     44   17-13   56.7
+  133  Central Michigan (CMU)    MAC          30   17-13   56.7
+  134  Coastal Carolina (CSTCA)  Big South    21   17-13   56.7
+  135  Michigan State (MI ST)    Big Ten      94   17-13   56.7
+  136  Pennsylvania (PA)         Ivy League   44   17-13   56.7
+  137  Siena (SIENA)             MAAC         64   17-13   56.7
+  138  Vanderbilt (VNDY)         SEC          83   17-13   56.7
+  139  William & Mary (WM)       CAA          35   17-13   56.7
+  140  Brown (BROWN)             Ivy League   30   18-14   56.3
+  141  Middle Tennessee (MTNST)  Sun Belt     47   18-14   56.3
+  142  Northern Iowa (NTHIA)     MVC          66   18-14   56.3
+  143  Santa Clara (STACL)       WCC          44   18-14   56.3
+  144  Southern Methodist (SMU)  Conference USA   40   18-14   56.3
+  145  Troy (TYST)               Sun Belt     47   18-14   56.3
+  146  Utah (UTAH)               Mountain West   76   18-14   56.3
+  147  Cincinnati (CINN)         Big East     80   16-13   55.2
+  148  Saint Louis (STL)         Atlantic 10   67   16-13   55.2
+  149  Baylor (BAYLR)            Big 12       64   17-14   54.8
+  150  George Washington (GGWA)  Atlantic 10   58   17-14   54.8
+  151  Miami (MIAMI)             ACC          74   17-14   54.8
+  152  Monmouth (MNMTH)          Northeast    27   17-14   54.8
+  153  Rutgers (RTGRS)           Big East     54   17-14   54.8
+  154  UCLA (UCLA)               Pacific-10   84   17-14   54.8
+  155  Appalachian State (APST)  Southern     40   18-15   54.5
+  156  Boise State (BSST)        WAC          53   18-15   54.5
+  157  Colorado (CO)             Big 12       58   18-15   54.5
+  158  Indiana State (IN ST)     MVC          50   18-15   54.5
+  159  Kent State (KNTST)        MAC          76   18-15   54.5
+  160  Massachusetts (UMASS)     Atlantic 10   61   18-15   54.5
+  161  Nevada (NV)               WAC          70   18-15   54.5
+  162  Canisius (CANSS)          MAAC         24   16-14   53.3
+  163  Florida State (FLST)      ACC          75   16-14   53.3
+  164  Louisiana Tech (LA TC)    WAC          49   16-14   53.3
+  165  New Orleans (NEWOR)       Sun Belt     29   16-14   53.3
+  166  Northern Arizona (NTHAZ)  Big Sky      35   16-14   53.3
+  167  Oregon State (OR ST)      Pacific-10   45   16-14   53.3
+  168  Radford (RDFD)            Big South    28   16-14   53.3
+  169  Kennesaw State (KNST)     Atlantic Sun    8   16-14   53.3
+  170  Drexel (DRXL)             CAA          53   17-15   53.1
+  171  Hofstra (HFSTR)           CAA          56   17-15   53.1
+  172  Michigan (MICH)           Big Ten      68   17-15   53.1
+  173  Montana (MT)              Big Sky      42   17-15   53.1
+  174  Oral Roberts (ORLRB)      Summit       54   17-15   53.1
+  175  Portland (PORTL)          WCC          33   17-15   53.1
+  176  Missouri State (SWMS)     MVC          65   17-15   53.1
+  177  UNC Asheville (NCAS)      Big South    29   17-15   53.1
+  178  Mississippi (MS)          SEC          76   15-14   51.7
+  179  Missouri (MO)             Big 12       79   15-14   51.7
+  180  South Florida (STFL)      Big East     52   15-14   51.7
+  181  Colgate (COLG)            Patriot League   22   16-15   51.6
+  182  Northeastern (NTHES)      CAA          48   16-15   51.6
+  183  Notre Dame (ND)           Big East     84   16-15   51.6
+  184  Penn State (PA ST)        Big Ten      54   16-15   51.6
+  185  Texas Tech (TXTC)         Big 12       72   16-15   51.6
+  186  South Carolina State (SCST)MEAC         28   17-16   51.5
+  187  Belmont (BLMNT)           Atlantic Sun   50   16-16   50.0
+  188  Georgetown (GTOWN)        Big East     85   16-16   50.0
+  189  Liberty (LBRTY)           Big South    23   17-17   50.0
+  190  Ohio (OHIO)               MAC          60   16-16   50.0
+  191  Pepperdine (PPRDN)        WCC          39   15-15   50.0
+  192  Southeastern Louisiana (SELA)Southland    29   15-15   50.0
+  193  Texas Christian (TCU)     Mountain West   49   15-15   50.0
+  194  Tulsa (TLSA)              Conference USA   70   15-15   50.0
+  195  UMBC (UMBC)               America East   29   15-15   50.0
+  196  Southern (STHN)           SWAC         10   16-17   48.5
+  197  McNeese State (MCNST)     Southland    25   15-16   48.4
+  198  Northwestern (NW)         Big Ten      53   15-16   48.4
+  199  Boston College (BSCOL)    ACC          77   14-15   48.3
+  200  Florida A&M (FLAM)        MEAC         16   14-15   48.3
+  201  North Carolina State (NC ST)ACC          75   14-15   48.3
+  202  Tennessee (TENN)          SEC          89   14-15   48.3
+  203  Drake (DRAKE)             MVC          50   16-18   47.1

@@ -30,24 +30,20 @@ namespace Charm.Harness;
 //        directions, with two negative controls.
 //    C4  ★ nothing on disk moved — the S121 pins on a career played in random chunks
 //        both seasons; the S120 capture; and at every stage boundary the career
-//        folder's files: after the set-up exactly what the S122 build had written
-//        before its first tip, untouched by every advance, and after the close the
-//        one-call season's — with the season log's lock held throughout play.
+//        folder's files. ★ S124 (B1a): after the set-up and after every advance the
+//        folder is exactly what it was before the season (the career file and its
+//        lock), with the career lock held; after the close, the one-call season's
+//        folder, and the career file is the S122 capture — now written by the close.
 //    C5  page-only: calls and time per mode.
 //
-//  ★ WHY C4 PINS ONLY THREE THINGS FROM THE S122 PROBE (the S123 gate, CONVENTIONS §2,
-//  S81.3). The probe ran in the Linux sandbox. The career file and the event record are
-//  integers and strings by construction and are pinned. The scouting file and the log's
-//  roster section carry raw decimal bits that may differ in the last place on Windows, so
-//  their probe hashes are printed and never asserted; instead they are proven against this
-//  machine's own one-call season: the scouting file equal to it, the unfinished log exactly
-//  the front of its published log. The probe showed both relationships hold on the S122
-//  build.
+//  ★ S124 — the S122 probe's pre-play files (the six the set-up used to write) are retired
+//  with the writes themselves: a season now writes nothing before its close. The one probe
+//  value that survives is the career file, because the counters the set-up used to publish
+//  ARE the counters the close now publishes, byte for byte.
 //
-//  ★ READING A LIVE LOG (Windows). The writer holds the `.inprogress` file open for writing,
-//  sharing it for reading only; a reader must therefore allow writing too, or Windows refuses
-//  the open (Linux does not care, which is how this would hide in the sandbox). And no check
-//  ever writes to the live log: the one-byte control runs on a copy.
+//  ★ READING A FOLDER WHILE A FILE IN IT IS HELD (Windows). A reader opens every file allowing
+//  writing and deletion too, or Windows refuses the open (Linux does not care, which is how
+//  this would hide in the sandbox). The one-byte control runs on a copy.
 // ============================================================================
 
 internal static partial class Program
@@ -55,27 +51,11 @@ internal static partial class Program
     private const int SeasonRunChunkSeed = 123123;
 
     // ── ★ CAPTURED FROM THE S122 BUILD (the S123 gate's read-only probe: the stock career's
-    //    season one under the fixed history id, its first game made to throw on a scratch copy). ──
-    private static readonly string[] SeasonRunProbePrePlayFiles =
-    {
-        "career.events/season-1.json",
-        "career.gamelog/season-1.log.inprogress",
-        "career.gamelog/season-1.log.lock",
-        "career.gamelog/season-1.scout",
-        "career.json",
-        "career.json.lock",
-    };
-    /// <summary>The event record before the first tip: every seat, not yet any finish.</summary>
-    private const string SeasonRunProbePrePlayEvents =
-        "caa6b5fa2d42d7384bea611a01b34b503be1fd075bdf8cd3414237f1cd6632a9";
-    /// <summary>The career file before the first tip: the numbers the set-up spent.</summary>
-    private const string SeasonRunProbePrePlayCareer =
+    //    season one under the fixed history id). ──
+    /// <summary>The career file after season one's numbers: on the S122 build the set-up published
+    /// it before the first tip; ★ S124 — the close publishes it, as its last write, byte for byte.</summary>
+    private const string SeasonRunSeasonOneCareer =
         "9c892e97ad37e26959b150ec2648f2cf607907e4b855333e1cbbbdb6837ef4ec";
-    /// <summary>PAGE-ONLY (raw decimal bits; Linux): the scouting file and the unfinished log.</summary>
-    private const string SeasonRunProbeLinuxScout =
-        "3016d9cfd7840c7a6c59b57ed322988dab01587215b200054bc1761b788bb999";
-    private const string SeasonRunProbeLinuxInProgress =
-        "bde28dd64d165edc980072b2a38f9a290bde95d59e8e02eddabd97ff38ea1818";
 
     // ══════════════════════════════════════════════════════════════════════════════
     //  ★ THE STATE INVENTORY (K6). Every instance field of the season run, the walk and the
@@ -121,8 +101,10 @@ internal static partial class Program
         new("SeasonRun", "memoryOutcome", "SeasonMemoryOutcome", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "rotationOutcome", "SeasonRotationOutcome", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "nonConferenceDates", "NonConDateReport", SeasonStateCategory.ImmutableSetup),
-        new("SeasonRun", "recordStatus", "EventRecordStatus", SeasonStateCategory.ImmutableSetup),
-        new("SeasonRun", "recordDiagnostic", "string", SeasonStateCategory.ImmutableSetup),
+        new("SeasonRun", "eventRecordBody", "Byte[]", SeasonStateCategory.ImmutableSetup, "★ S124 — the NotPlayed record, written at the close"),
+        new("SeasonRun", "keepsLog", "bool", SeasonStateCategory.ImmutableSetup, "★ S124"),
+        new("SeasonRun", "logRoster", "List<RosterEntryV2>", SeasonStateCategory.ImmutableSetup, "★ S124 — the log's roster, written at the close"),
+        new("SeasonRun", "verbose", "bool", SeasonStateCategory.ImmutableSetup, "★ S124 — the close prints what it set aside"),
         new("SeasonRun", "divvy", "DivvyResult", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "people", "PeopleSummary", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "development", "DevelopmentStep", SeasonStateCategory.ImmutableSetup),
@@ -156,7 +138,7 @@ internal static partial class Program
         new("SeasonRun", "buySource", "BuyGameSource", SeasonStateCategory.Mutable),
         new("SeasonRun", "calendar", "SeasonCalendarRun", SeasonStateCategory.Mutable, "the walk; its fields are inventoried below"),
         new("SeasonRun", "resultSlots", "List<SeasonGameResult>", SeasonStateCategory.SharedReference, "the SAME list every ConfTourneySource reads"),
-        new("SeasonRun", "gameLog", "GameLogWriter", SeasonStateCategory.ResourceOrCallback, "an open file and a lock"),
+        new("SeasonRun", "closeStepForTest", "Action<string>", SeasonStateCategory.ResourceOrCallback, "★ S124 — the close's test seam; null in production"),
         new("SeasonRun", "finished", "bool", SeasonStateCategory.Mutable, "lifecycle; a save is only taken of an open run"),
         new("SeasonRun", "disposed", "bool", SeasonStateCategory.Mutable, "lifecycle"),
         new("SeasonRun", "faultedOn", "string", SeasonStateCategory.Mutable, "lifecycle"),
@@ -464,10 +446,12 @@ internal static partial class Program
             //  the console is captured for the run and restored before any Check prints.
             (SeasonRunOutcome Outcome, List<string> Months) Play(
                 string label, WorldFile w, long seed, string? career, SeasonChunkMode mode,
-                Action<SeasonRun>? afterBegin = null, Action<SeasonRun>? afterChunk = null, Action? afterFinish = null)
+                Action<SeasonRun>? afterBegin = null, Action<SeasonRun>? afterChunk = null, Action? afterFinish = null,
+                Action? beforeBegin = null)
             {
                 var sw = Stopwatch.StartNew();
                 var store = career is null ? null : HistoryStore.Open(career, WorldFingerprint(w));
+                beforeBegin?.Invoke();
                 var old = Console.Out;
                 var text = new StringWriter(CultureInfo.InvariantCulture);
                 SeasonRunOutcome outcome;
@@ -511,9 +495,9 @@ internal static partial class Program
             //  after the close.
             // ════════════════════════════════════════════════════════════════════
             var s1 = new Dictionary<SeasonChunkMode, (SeasonRunOutcome Outcome, List<string> Months)>();
-            SortedDictionary<string, string>? afterBegin = null;
-            byte[]? scoutAtBegin = null, inProgressAtBegin = null;
+            SortedDictionary<string, string>? beforeSeason = null, afterBegin = null;
             var lockHeldAtBegin = false;
+            var s1CareerLockHeldAfterFinish = false;
             var advanceFaults = new List<string>();
             var advancesWatched = 0;
             string? copyControl = null;
@@ -524,23 +508,23 @@ internal static partial class Program
                 var folder = "s1-" + mode;
                 Directory.CreateDirectory(Folder(folder));
                 var logLock = Path.Combine(Folder(folder), "career.gamelog", "season-1.log.lock");
+                var careerLock = Career(folder) + ".lock";
                 Action<SeasonRun>? begin = null, chunk = null;
-                Action? finish = null;
+                Action? finish = null, before = null;
                 if (mode == SeasonChunkMode.Random)
                 {
+                    before = () => beforeSeason = SeasonFolderSnapshot(Folder(folder));
                     begin = _ =>
                     {
                         afterBegin = SeasonFolderSnapshot(Folder(folder));
-                        scoutAtBegin = SeasonReadShared(Path.Combine(Folder(folder), "career.gamelog", "season-1.scout"));
-                        inProgressAtBegin = SeasonReadShared(Path.Combine(Folder(folder), "career.gamelog", "season-1.log.inprogress"));
-                        lockHeldAtBegin = SeasonLockHeld(logLock);
+                        lockHeldAtBegin = SeasonLockHeld(careerLock);
                     };
                     chunk = run =>
                     {
                         advancesWatched++;
-                        var diff = SeasonSnapshotDiff(afterBegin!, SeasonFolderSnapshot(Folder(folder)));
+                        var diff = SeasonSnapshotDiff(beforeSeason!, SeasonFolderSnapshot(Folder(folder)));
                         if (diff is not null) advanceFaults.Add(Inv($"after advancing through {run.NextDay.AddDays(-1):yyyy-MM-dd}: {diff}"));
-                        if (!SeasonLockHeld(logLock)) advanceFaults.Add(Inv($"lock free after {run.NextDay.AddDays(-1):yyyy-MM-dd}"));
+                        if (!SeasonLockHeld(careerLock)) advanceFaults.Add(Inv($"career lock free after {run.NextDay.AddDays(-1):yyyy-MM-dd}"));
                         if (copyControl is null)
                         {
                             //  The control's copy, taken once, from the live folder. The live log is never written.
@@ -557,14 +541,13 @@ internal static partial class Program
                     {
                         s1FinishSnap = SeasonFolderSnapshot(Folder(folder));
                         s1LockFreeAfterFinish = !SeasonLockHeld(logLock);
+                        s1CareerLockHeldAfterFinish = SeasonLockHeld(careerLock);
                     };
                 }
-                s1[mode] = Play("stock career season one", stock, CalendarCheckSeed, Career(folder), mode, begin, chunk, finish);
+                s1[mode] = Play("stock career season one", stock, CalendarCheckSeed, Career(folder), mode, begin, chunk, finish, before);
             }
             //  The one-call career as season one left it (season two runs in the same folder below).
             var s1OneCallSnap = SeasonFolderSnapshot(Folder("s1-OneCall"));
-            var finalScout = File.ReadAllBytes(Path.Combine(Folder("s1-OneCall"), "career.gamelog", "season-1.scout"));
-            var finalLog = File.ReadAllBytes(Path.Combine(Folder("s1-OneCall"), "career.gamelog", "season-1.log"));
 
             // ── C1a ──
             {
@@ -658,7 +641,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 Directory.CreateDirectory(Folder("mte-contract"));
-                using var store = HistoryStore.Open(Career("mte-contract"), WorldFingerprint(mte));
+                var store = HistoryStore.Open(Career("mte-contract"), WorldFingerprint(mte));
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
                 var startsFirst = run.NextDay == run.FirstLegalDay && !run.IsComplete && run.GamesPlayed == 0;
@@ -678,6 +661,9 @@ internal static partial class Program
                       noop && playedThen > 0, Inv($"{playedThen} games through {run.FirstLegalDay.AddDays(20):yyyy-MM-dd}"));
                 run.AdvanceThrough(run.LastLegalDay);
                 var outcome = run.Finish();
+                //  ★ S124 — the career lock is the store's, held until it is disposed; the folder is compared
+                //    byte for byte (its lock sidecar included), so the store is released first.
+                store.Dispose();
                 var diff = SeasonOutcomeDiff(mteOne, outcome);
                 var files = CalendarFilesDiffer(Folder("mte-OneCall"), Folder("mte-contract"));
                 Check("C2f: ★ after every refusal above the same run advanced and finished identical to C1d's one-call run, " +
@@ -697,24 +683,23 @@ internal static partial class Program
                       disposeFault?.Message ?? Short(deadAdvance));
             }
             {
-                //  A run set up and never advanced: disposed, it leaves exactly a crash's files and frees the lock.
+                //  A run set up and never advanced, disposed: ★ S124 — the career folder is exactly what it was
+                //  before the season began (the career file byte-identical, no other file).
                 Directory.CreateDirectory(Folder("mte-abandoned"));
                 using var store = HistoryStore.Open(Career("mte-abandoned"), WorldFingerprint(mte));
+                var before = SeasonFolderSnapshot(Folder("mte-abandoned"));
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
-                var logLock = Path.Combine(Folder("mte-abandoned"), "career.gamelog", "season-1.log.lock");
-                var heldBefore = SeasonLockHeld(logLock);
-                var before = SeasonFolderSnapshot(Folder("mte-abandoned"));
                 Exception? disposeFault = null;
                 try { run.Dispose(); } catch (Exception ex) { disposeFault = ex; }
                 var after = SeasonFolderSnapshot(Folder("mte-abandoned"));
                 var refused = Refusal(() => run.AdvanceThrough(run.LastLegalDay));
-                Check("C2i: a run never advanced, disposed: Dispose succeeds, the lock is released, no file changes (the " +
-                      "unfinished log stays, as a crash leaves it), and every call after is refused by name",
-                      disposeFault is null && heldBefore && !SeasonLockHeld(logLock) && SeasonSnapshotDiff(before, after) is null
-                      && after.ContainsKey("career.gamelog/season-1.log.inprogress") && !after.ContainsKey("career.gamelog/season-1.log")
+                Check("C2i: ★ S124 — a run never advanced, disposed: Dispose succeeds, the career folder is exactly what it was " +
+                      "before the season (the career file byte-identical and its lock, no other file), and every call after is refused by name",
+                      disposeFault is null && SeasonSnapshotDiff(before, after) is null
+                      && after.Keys.SequenceEqual(new[] { "career.json", "career.json.lock" })
                       && Says(refused, "disposed"),
-                      disposeFault?.Message ?? Inv($"{after.Count} files; {Short(refused)}"));
+                      disposeFault?.Message ?? SeasonSnapshotDiff(before, after) ?? Inv($"[{string.Join(", ", after.Keys)}]; {Short(refused)}"));
             }
             {
                 //  Fixture order: one call or nothing.
@@ -763,7 +748,7 @@ internal static partial class Program
                 //  The same fault at the season-run level: the walk's play callback replaced by reflection
                 //  (test-only; no production code reads anything for it), throwing on a chosen game day.
                 Directory.CreateDirectory(Folder("mte-fault"));
-                using var store = HistoryStore.Open(Career("mte-fault"), WorldFingerprint(mte));
+                var store = HistoryStore.Open(Career("mte-fault"), WorldFingerprint(mte));
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
                 run.AdvanceThrough(run.FirstLegalDay.AddDays(9));
@@ -781,14 +766,19 @@ internal static partial class Program
                     Refusal(() => run.Finish()),
                     Refusal(() => _ = run.IsComplete),
                 };
-                var logLock = Path.Combine(Folder("mte-fault"), "career.gamelog", "season-1.log.lock");
-                var heldWhileFaulted = SeasonLockHeld(logLock);
+                var careerLock = Career("mte-fault") + ".lock";
+                var heldWhileFaulted = SeasonLockHeld(careerLock);
+                var noLog = !Directory.Exists(Path.Combine(Folder("mte-fault"), "career.gamelog"));
                 Exception? disposeFault = null;
                 try { run.Dispose(); } catch (Exception ex) { disposeFault = ex; }
+                var heldAfterRunDisposed = SeasonLockHeld(careerLock);
+                store.Dispose();
+                var freeAfterStore = !SeasonLockHeld(careerLock);
                 Check("C2l: ★ the same fault in a real career season: the advance throws the original; every later call is refused " +
-                      "naming the day; the season log's lock is held until Dispose, which succeeds, and then a new writer can take it",
+                      "naming the day; ★ S124 — no season log exists during play, and the CAREER lock is held through the fault, " +
+                      "until the store is disposed, which then frees it",
                       Says(thrown, "CONSTRUCTED ENGINE FAULT") && later.All(r => Says(r, "failed on " + day))
-                      && heldWhileFaulted && disposeFault is null && !SeasonLockHeld(logLock),
+                      && noLog && heldWhileFaulted && disposeFault is null && heldAfterRunDisposed && freeAfterStore,
                       Inv($"fault day {day}: ") + Short(later[0]));
             }
 
@@ -831,53 +821,40 @@ internal static partial class Program
                 Check("C4c: ★ the legacy stock season played day by day is the S120 capture",
                       GamesDigest(legacyDay.Outcome) == RatingGoldenPreS112GameDigest, GamesDigest(legacyDay.Outcome)[..16]);
 
-                //  The stage boundaries.
-                var listOk = afterBegin is not null && afterBegin.Keys.SequenceEqual(SeasonRunProbePrePlayFiles);
-                var eventsOk = afterBegin?.GetValueOrDefault("career.events/season-1.json") == SeasonRunProbePrePlayEvents;
-                var careerOk = afterBegin?.GetValueOrDefault("career.json") == SeasonRunProbePrePlayCareer;
-                Check("C4d: ★ after the set-up: exactly the six files the S122 build had written before its first tip, the event " +
-                      "record and the career file byte for byte the S122 build's (captured from the S122 build), the season log's lock held",
-                      listOk && eventsOk && careerOk && lockHeldAtBegin,
-                      afterBegin is null ? "NO SNAPSHOT" : Inv($"[{string.Join(", ", afterBegin.Keys)}]"));
-                var scoutSame = scoutAtBegin is not null && scoutAtBegin.AsSpan().SequenceEqual(finalScout);
-                var logPrefix = inProgressAtBegin is not null && inProgressAtBegin.Length < finalLog.Length
-                                && finalLog.AsSpan(0, inProgressAtBegin.Length).SequenceEqual(inProgressAtBegin);
-                Check("C4e: ★ ...and on this machine: the scouting file written by the set-up is the one-call season's, byte for " +
-                      "byte, and the unfinished log is exactly the front of the log the one-call season published",
-                      scoutSame && logPrefix,
-                      Inv($"scouting {(scoutSame ? "same" : "DIFFERS")}; log {inProgressAtBegin?.Length ?? 0:N0} of {finalLog.Length:N0} bytes, ") +
-                      (logPrefix ? "a prefix" : "NOT a prefix"));
-                Check("C4f: ★ after every advance (random chunks): the file list and every readable file unchanged from after the " +
-                      "set-up, and the season log's lock held",
+                //  The stage boundaries. ★ S124 (B1a) — a season writes nothing until it closes.
+                var beforeDiff = beforeSeason is null || afterBegin is null ? "NO SNAPSHOT" : SeasonSnapshotDiff(beforeSeason, afterBegin);
+                Check("C4d: ★ S124 — after the set-up: the career folder is exactly what it was before the season (the career " +
+                      "file byte-identical and its lock sidecar, nothing else), and the career lock is held",
+                      beforeDiff is null && afterBegin!.Keys.SequenceEqual(new[] { "career.json", "career.json.lock" }) && lockHeldAtBegin,
+                      beforeDiff ?? Inv($"[{string.Join(", ", afterBegin!.Keys)}]"));
+                //  (C4e, the unfinished log's prefix relation, is retired at S124: there is no unfinished log.)
+                Check("C4f: ★ after every advance (random chunks): still exactly the folder from before the season, and the " +
+                      "career lock held",
                       advanceFaults.Count == 0 && advancesWatched > 1,
                       advanceFaults.Count > 0 ? string.Join("; ", advanceFaults.Take(3)) : Inv($"{advancesWatched} advances watched"));
-                //  After the close (read before Dispose): the one-call season's folder as season one left it.
+                //  After the close (read before the store is disposed): the one-call season's folder as season one left it.
                 var finishFault = s1FinishSnap is null ? "NO SNAPSHOT" : SeasonSnapshotDiff(s1OneCallSnap, s1FinishSnap);
-                var careerUnwritten = s1FinishSnap?.GetValueOrDefault("career.json") == SeasonRunProbePrePlayCareer;
-                Check("C4g: ★ after the close: the file list and every file the one-call season's byte for byte (the career " +
-                      "file still the S122 pre-play capture — the close never writes it), and the season log's lock released by the close",
-                      finishFault is null && careerUnwritten && s1LockFreeAfterFinish
+                var careerWritten = s1FinishSnap?.GetValueOrDefault("career.json") == SeasonRunSeasonOneCareer;
+                Check("C4g: ★ after the close: the file list and every file the one-call season's byte for byte; the career file " +
+                      "is the S122 capture, now written by the close; the season log's lock released by the close and the career " +
+                      "lock still held (it is the store's, released when the store is disposed)",
+                      finishFault is null && careerWritten && s1LockFreeAfterFinish && s1CareerLockHeldAfterFinish
                       && s1FinishSnap!.ContainsKey("career.gamelog/season-1.log") && !s1FinishSnap.ContainsKey("career.gamelog/season-1.log.inprogress"),
                       finishFault ?? Inv($"{s1FinishSnap!.Count} files"));
 
-                //  NEGATIVE CONTROL, on a copy of the folder taken mid-season (the live log is never written).
-                var copyAppend = Path.Combine(copyControl ?? scratch, "career.gamelog", "season-1.log.inprogress");
+                //  NEGATIVE CONTROL, on a copy of the folder taken mid-season (the live folder is never written).
+                var copyCareer = Path.Combine(copyControl ?? scratch, "career.json");
                 string? controlDiff = null;
                 if (copyControl is not null)
                 {
-                    var before = SeasonSnapshotDiff(afterBegin!, SeasonFolderSnapshot(copyControl));
-                    using (var fs = new FileStream(copyAppend, FileMode.Append, FileAccess.Write)) fs.WriteByte(0x2A);
-                    controlDiff = SeasonSnapshotDiff(afterBegin!, SeasonFolderSnapshot(copyControl));
+                    var before = SeasonSnapshotDiff(beforeSeason!, SeasonFolderSnapshot(copyControl));
+                    using (var fs = new FileStream(copyCareer, FileMode.Append, FileAccess.Write)) fs.WriteByte(0x2A);
+                    controlDiff = SeasonSnapshotDiff(beforeSeason!, SeasonFolderSnapshot(copyControl));
                     if (before is not null) controlDiff = "the copy differed BEFORE the byte: " + before;
                 }
-                Check("C4h: NEGATIVE CONTROL — a copy of the live folder with one byte appended to the unfinished log fails the " +
+                Check("C4h: NEGATIVE CONTROL — a copy of the live folder with one byte appended to the career file fails the " +
                       "comparison, naming that file",
-                      controlDiff is not null && controlDiff == "career.gamelog/season-1.log.inprogress differs", controlDiff ?? "NO DIFFERENCE");
-
-                //  Page-only: the probe's raw-bits hashes, never asserted (CONVENTIONS §2, S81.3).
-                Console.WriteLine("  [page] the S122 probe's Linux hashes for the two raw-bits files, against this machine (never asserted): " +
-                    Inv($"scouting {(afterBegin?.GetValueOrDefault("career.gamelog/season-1.scout") == SeasonRunProbeLinuxScout ? "same" : "differs")}, ") +
-                    Inv($"unfinished log {(afterBegin?.GetValueOrDefault("career.gamelog/season-1.log.inprogress") == SeasonRunProbeLinuxInProgress ? "same" : "differs")}"));
+                      controlDiff is not null && controlDiff == "career.json differs", controlDiff ?? "NO DIFFERENCE");
             }
 
             // ════════════════════════════════════════════════════════════════════

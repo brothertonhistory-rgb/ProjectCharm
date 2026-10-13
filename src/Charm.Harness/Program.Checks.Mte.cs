@@ -98,7 +98,7 @@ internal static partial class Program
 
             var emptySeating = MteSeatSeason(tiny, MteCheckSeed, MteHistory.Empty);
             var emptyOutcome = new EventSeasonOutcome(
-                emptySeating, EventRecordStatus.NotApplicable, null, Array.Empty<string>());
+                emptySeating, EventRecordStatus.NotApplicable, Array.Empty<string>());
             Check("C1d: ★ an empty pool prints NOTHING — no heading, no blank line, which is what " +
                   "makes the byte-identity claim honest",
                   emptySeating.PoolIsEmpty && MtePageLines(emptyOutcome).Count == 0);
@@ -538,27 +538,35 @@ internal static partial class Program
             }
 
             // ════════════════════════════════════════════════════════════════════
-            //  C7 — WRITE FAILURE AFTER THE COMMIT. The one deliberately non-atomic seam.
+            //  C7 — A RECORD THAT CANNOT BE WRITTEN. ★ S124 (K5) REVERSED THIS: until S124 the
+            //  record was written after the season's numbers were durable, so a failure left a
+            //  played season with a hole in its event history. Now the record is written at the
+            //  close, BEFORE the career file, so a failure fails the close by name and nothing
+            //  is published: the season is played again next run.
             // ════════════════════════════════════════════════════════════════════
             var failPath = Path.Combine(scratch, "failing.json");
             // The seam, with no production test hook: a regular FILE standing where the
-            // record folder must be. Directory creation fails, so publication fails before
-            // any final file can exist — which is exactly the branch C7 is about.
+            // record folder must be. Directory creation fails, so no record can be written.
             File.WriteAllText(MteRecordFolderFor(failPath), "not a directory");
-            EventSeasonOutcome failed;
+            string? failMsg;
             long spentBefore, spentAfter;
+            byte[] failCareerBefore;
             using (var store = HistoryStore.Open(failPath, WorldFingerprint(mte)))
             {
                 spentBefore = store.PeekNextSeasonId;
-                failed = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
-                spentAfter = store.PeekNextSeasonId;
+                failCareerBefore = File.ReadAllBytes(failPath);
+                failMsg = Refusal(() => RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
             }
-            Check("C7a: ★ a record write that fails AFTER the commit does not invalidate the season — " +
-                  "the schedule played and the season id is provably spent",
-                  failed.RecordStatus == EventRecordStatus.WriteFailed && spentAfter == spentBefore + 1,
-                  $"peek {spentBefore} → {spentAfter}");
-            Check("C7b: the page carries a stable diagnostic rather than a raw exception message",
-                  MtePageLines(failed).Any(l => l.Contains("EVENT RECORD NOT WRITTEN")));
+            using (var store = HistoryStore.Open(failPath, WorldFingerprint(mte)))
+                spentAfter = store.PeekNextSeasonId;
+            Check("C7a: ★ S124 — a record that cannot be written FAILS THE CLOSE BY NAME; reopened, the career " +
+                  "has not moved (its file byte-identical) and no season file was published",
+                  failMsg is not null && failMsg.Contains("SEASON EVENT RECORD NOT WRITTEN")
+                  && failMsg.Contains("season-" + spentBefore.ToString(CultureInfo.InvariantCulture))
+                  && spentAfter == spentBefore
+                  && File.ReadAllBytes(failPath).SequenceEqual(failCareerBefore)
+                  && !Directory.Exists(GameLogWriter.LogFolderFor(failPath)),
+                  $"peek {spentBefore} → {spentAfter}; {(failMsg is null ? "NO REFUSAL" : "refused")}");
 
             // ════════════════════════════════════════════════════════════════════
             //  C8 — ISOLATION. Events cannot perturb one possession of basketball.
@@ -604,33 +612,40 @@ internal static partial class Program
                   $"{withEvents.TournamentGameCount} tournament games on, {without.TournamentGameCount} off");
 
             // ════════════════════════════════════════════════════════════════════
-            //  C9 — THE COLLISION REFUSAL, before anything is spent.
+            //  C9 — A RECORD ALREADY CLAIMING THE PENDING SEASON. ★ S124 (K4) REPLACED S97's
+            //  refusal: such a file can only be left by a close that did not finish (or placed by
+            //  hand), so the close SETS IT ASIDE into career.orphans/, byte-untouched, and writes
+            //  the season's real record.
             // ════════════════════════════════════════════════════════════════════
             var collidePath = Path.Combine(scratch, "collide.json");
             string? collideMsg;
             long cBefore, cAfter;
-            byte[] plantedBefore, plantedAfter;
+            byte[] plantedBefore;
+            string planted, setAsideAt;
             using (var store = HistoryStore.Open(collidePath, WorldFingerprint(mte)))
             {
                 cBefore = store.PeekNextSeasonId;
                 Directory.CreateDirectory(MteRecordFolderFor(collidePath));
-                var planted = MteRecordPathFor(collidePath, cBefore);
+                planted = MteRecordPathFor(collidePath, cBefore);
                 File.WriteAllText(planted, "{ \"planted\": true }");
                 plantedBefore = File.ReadAllBytes(planted);
                 collideMsg = Refusal(() =>
                     RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
-                cAfter = store.PeekNextSeasonId;
-                plantedAfter = File.ReadAllBytes(planted);
             }
-            Check("C9a: ★ a record already claiming the pending season refuses the schedule commit, " +
-                  "naming the path",
-                  collideMsg is not null && collideMsg.Contains("SEASON EVENT RECORD COLLISION")
-                  && collideMsg.Contains("season-" + cBefore.ToString(CultureInfo.InvariantCulture)),
-                  collideMsg is null ? "NO REFUSAL" : "refused");
-            Check("C9b: ★ the pending season id is provably UNSPENT — the precheck runs before the commit",
-                  cBefore == cAfter, $"peek {cBefore} → {cAfter}");
-            Check("C9c: the existing file is byte-untouched and was never mistaken for this run's output",
-                  plantedBefore.SequenceEqual(plantedAfter));
+            using (var store = HistoryStore.Open(collidePath, WorldFingerprint(mte)))
+                cAfter = store.PeekNextSeasonId;
+            setAsideAt = Path.Combine(CareerOrphansFolderFor(collidePath), Path.GetFileName(MteRecordFolderFor(collidePath)),
+                                      Path.GetFileName(planted));
+            Check("C9a: ★ S124 — a record already claiming the pending season no longer refuses the season: " +
+                  "the season plays and PUBLISHES",
+                  collideMsg is null && cAfter == cBefore + 1,
+                  collideMsg ?? $"peek {cBefore} → {cAfter}");
+            Check("C9b: ★ the planted file was SET ASIDE into career.orphans/, byte-untouched",
+                  File.Exists(setAsideAt) && File.ReadAllBytes(setAsideAt).SequenceEqual(plantedBefore),
+                  setAsideAt);
+            Check("C9c: and the season's REAL record now stands at the path — never the planted bytes",
+                  File.Exists(planted) && !File.ReadAllBytes(planted).SequenceEqual(plantedBefore)
+                  && File.ReadAllText(planted).Contains("\"formatVersion\"", StringComparison.Ordinal));
         }
         catch (Exception ex)
         {

@@ -413,7 +413,12 @@ internal static partial class Program
             SeasonRunOutcome ledger;
             long spentBefore, spentAfter;
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
+            {
                 spentBefore = RawGameNumber(store.ReserveGames(1)[0]);
+                // ★ S124 — the probe is published (a store of its own, so nothing else moves);
+                //   unpublished, the season below would reissue it and the subtraction would be one short.
+                store.PublishReservations();
+            }
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
                 ledger = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
@@ -541,79 +546,84 @@ internal static partial class Program
                       && career.Events.Seating.Active.First(e => e.EventId == 10).Seats
                               .All(s => palm.ContainsKey(s.Seat)));
 
-                //  ── the three refusals, each on its own doctored copy ───────────
+                //  ── the refusals, each on its own doctored body ─────────────────
+                //  ★ S124 (K3) — the finalizer is PURE: it validates the NotPlayed body the set-up
+                //    built in memory and returns the final bytes; the writer (MteWriteRecord) is
+                //    separate. So the refusals are proven against bodies, and "nothing was written"
+                //    against the folder the writer would have used.
                 var pristine = File.ReadAllBytes(recPath);
-                var empty = new Dictionary<int, IReadOnlyDictionary<int, int>>();
                 var seatsOf = career.Events.Seating.Active
                     .Where(e => MteEventPlays(e))
                     .ToDictionary(e => e.EventId,
                                   e => (IReadOnlyDictionary<int, int>)e.Seats.ToDictionary(s => s.Seat, s => s.SchoolId));
                 var finishesOf = career.EventFinishes;
+                int CareerFolderFiles(string path)
+                    => Directory.Exists(MteRecordFolderFor(path)) ? Directory.GetFiles(MteRecordFolderFor(path)).Length : 0;
 
-                using (var store = HistoryStore.Open(careerPath, careerWorldFp))
                 {
-                    var msg = Refusal(() => MteReplaceRecordWithFinishes(
-                        store, careerSeason, finishesOf, seatsOf));
-                    Check("C8e: ★ the replacement REFUSES a record already marked Completed — there is " +
+                    var filesBefore = CareerFolderFiles(careerPath);
+                    var msg = Refusal(() => MteFinalRecordBytes(
+                        pristine, careerHistoryId, careerSeason, finishesOf, seatsOf));
+                    Check("C8e: ★ the finalizer REFUSES a body already marked Completed — there is " +
                           "no reopen path, so this is a corruption tripwire and not a lifecycle branch",
                           msg is not null && msg.Contains("is not NotPlayed"),
                           msg is null ? "NO REFUSAL" : "refused");
-                    Check("C8f: and the record on disk is byte-untouched by the refusal",
-                          File.ReadAllBytes(recPath).SequenceEqual(pristine));
+                    Check("C8f: and nothing was written — the career's record is byte-untouched and no file appeared",
+                          File.ReadAllBytes(recPath).SequenceEqual(pristine) && CareerFolderFiles(careerPath) == filesBefore);
                 }
 
-                //  A fresh NotPlayed record to attack, so the remaining refusals are not
-                //  answered by the Completed guard firing first.
+                //  A fresh career's record, turned back to NotPlayed IN MEMORY, to attack — so the
+                //  remaining refusals are not answered by the Completed guard firing first.
                 var freshPath = Path.Combine(scratch, "fresh.json");
                 using (var store = HistoryStore.Open(freshPath, WorldFingerprint(mte)))
                 {
                     var freshSeason = store.PeekNextSeasonId;
+                    var freshHistoryId = store.HistoryId;
                     RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
                     var freshRec = MteRecordPathFor(freshPath, freshSeason);
-                    // That run completed it; rewrite the file back to NotPlayed to attack it.
-                    File.WriteAllText(freshRec, File.ReadAllText(freshRec)
-                        .Replace("\"playStatus\": \"Completed\"", "\"playStatus\": \"NotPlayed\"", StringComparison.Ordinal));
-                    var reNotPlayed = File.ReadAllText(freshRec);
-                    var withNulls = System.Text.RegularExpressions.Regex.Replace(
-                        reNotPlayed, "\"finishBySeat\": \\[[^\\]]*\\]", "\"finishBySeat\": null");
-                    File.WriteAllText(freshRec, withNulls);
-                    var restored = File.ReadAllBytes(freshRec);
+                    var reNotPlayed = File.ReadAllText(freshRec)
+                        .Replace("\"playStatus\": \"Completed\"", "\"playStatus\": \"NotPlayed\"", StringComparison.Ordinal);
+                    var body = System.Text.Encoding.UTF8.GetBytes(System.Text.RegularExpressions.Regex.Replace(
+                        reNotPlayed, "\"finishBySeat\": \\[[^\\]]*\\]", "\"finishBySeat\": null"));
 
+                    //  The writer's target: a career folder of its own with nothing in it yet.
+                    var target = Path.Combine(scratch, "write-target", "career.json");
                     var badSeats = seatsOf.ToDictionary(
                         kv => kv.Key,
                         kv => (IReadOnlyDictionary<int, int>)kv.Value.ToDictionary(
                             s => s.Key, s => s.Key == 1 ? -99 : s.Value));
-                    var msg2 = Refusal(() => MteReplaceRecordWithFinishes(
-                        store, freshSeason, finishesOf, badSeats));
-                    Check("C8g: ★ the replacement REFUSES when the seats on disk are not the field the " +
+                    var msg2 = Refusal(() => MteFinalRecordBytes(
+                        body, freshHistoryId, freshSeason, finishesOf, badSeats));
+                    Check("C8g: ★ the finalizer REFUSES when the seats in the record are not the field the " +
                           "games were played between",
-                          msg2 is not null && msg2.Contains("seats on disk"),
+                          msg2 is not null && msg2.Contains("seats in the record"),
                           msg2 is null ? "NO REFUSAL" : "refused");
-                    Check("C8h: and that refusal too left the record byte-identical, and left no temp " +
-                          "file behind",
-                          File.ReadAllBytes(freshRec).SequenceEqual(restored)
-                          && Directory.GetFiles(MteRecordFolderFor(freshPath), ".charm-events-*.tmp").Length == 0);
+                    Check("C8h: and that refusal wrote nothing — no record folder, no record, no temp file",
+                          !Directory.Exists(MteRecordFolderFor(target)) && !File.Exists(MteRecordPathFor(target, freshSeason)));
+
+                    var finalBytes = MteFinalRecordBytes(body, freshHistoryId, freshSeason, finishesOf, seatsOf);
 
                     //  ★ ATOMICITY, NOT MERELY REFUSAL. The failure is forced through the INJECTED
-                    //    replace delegate — never file permissions, an invalid path, OS locking or a
+                    //    publish delegate — never file permissions, an invalid path, OS locking or a
                     //    global mutable switch, every one of which would prove something about the
                     //    filesystem rather than about this method.
-                    var msg3 = Refusal(() => MteReplaceRecordWithFinishes(
-                        store, freshSeason, finishesOf, seatsOf,
-                        replace: (_, _) => throw new IOException("injected")));
-                    Check("C8i: ★ a failure forced AT THE RENAME leaves the NotPlayed record " +
-                          "BYTE-IDENTICAL and leaves no temp file behind",
-                          msg3 is not null && msg3.Contains("injected")
-                          && File.ReadAllBytes(freshRec).SequenceEqual(restored)
-                          && Directory.GetFiles(MteRecordFolderFor(freshPath), ".charm-events-*.tmp").Length == 0);
+                    var msg3 = Refusal(() => MteWriteRecord(
+                        target, freshSeason, finalBytes, publish: (_, _) => throw new IOException("injected")));
+                    Check("C8i: ★ a failure forced AT THE RENAME is refused by name, publishes NO record " +
+                          "and leaves no temp file behind",
+                          msg3 is not null && msg3.Contains("injected") && msg3.Contains("SEASON EVENT RECORD NOT WRITTEN")
+                          && !File.Exists(MteRecordPathFor(target, freshSeason))
+                          && Directory.GetFiles(MteRecordFolderFor(target), ".charm-events-*.tmp").Length == 0,
+                          msg3 is null ? "NO REFUSAL" : "refused");
 
-                    var msg4 = Refusal(() => MteReplaceRecordWithFinishes(
-                        store, freshSeason, finishesOf, seatsOf));
-                    Check("C8j: ★ and the SUCCESS path still works afterwards, leaving no temp file — " +
-                          "the failure was a hole, not damage",
+                    var msg4 = Refusal(() => MteWriteRecord(target, freshSeason, finalBytes));
+                    Check("C8j: ★ and the SUCCESS path still works afterwards — the final record is written " +
+                          "whole, Completed, and no temp file is left",
                           msg4 is null
-                          && Directory.GetFiles(MteRecordFolderFor(freshPath), ".charm-events-*.tmp").Length == 0
-                          && File.ReadAllText(freshRec).Contains("\"playStatus\": \"Completed\""));
+                          && File.ReadAllBytes(MteRecordPathFor(target, freshSeason)).SequenceEqual(finalBytes)
+                          && Directory.GetFiles(MteRecordFolderFor(target), ".charm-events-*.tmp").Length == 0
+                          && File.ReadAllText(MteRecordPathFor(target, freshSeason)).Contains("\"playStatus\": \"Completed\""),
+                          msg4 ?? "written");
                 }
             }
 
@@ -651,6 +661,9 @@ internal static partial class Program
                                  MinimalRows(roster[0].PersonId));
                     w.Finalize(2);
                     w.Dispose();
+                    // ★ S124 — numbers are held until published; the reopen below must find this
+                    //   hand-built season played, so it is published as a season's close would.
+                    store.PublishReservations();
                 }
                 using (var store = HistoryStore.Open(leakPath, fp))
                 {
