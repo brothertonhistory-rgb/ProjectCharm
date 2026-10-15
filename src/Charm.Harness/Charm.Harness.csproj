@@ -241,8 +241,17 @@
          with a placeholder world fingerprint and a pinned lineage label. It exists so that a
          later session cannot change the key order, the indent, the encoding or the trailing
          newline of a save file without the suite saying so out loud. (S118.2: the v1 golden
-         is retired with the v1 upgrade, C-60.) -->
-    <None Include="..\..\tools\history_v3_golden.json" Link="tools\history_v3_golden.json">
+         is retired with the v1 upgrade, C-60. S125: the v3 golden retires with v3; the v4 one
+         carries the file list and the fingerprint line, and the league golden pins league-0.) -->
+    <None Include="..\..\tools\history_v4_golden.json" Link="tools\history_v4_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\tools\league_v1_golden.json" Link="tools\league_v1_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S125 — a career file written by the S124 build (v3), kept ONLY to prove a career saved
+         before S125 is refused by name at `season` and at every page, byte-untouched (Phase 116 C4). -->
+    <None Include="..\..\tools\history_v3_career\career.json" Link="tools\history_v3_career\career.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- S120 free-throw lane golden (emitted by tools/ft_lane_oracle.py, which reads the frozen

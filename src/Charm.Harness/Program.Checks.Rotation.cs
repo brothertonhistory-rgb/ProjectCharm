@@ -152,7 +152,7 @@ internal static partial class Program
             var firstPath = Path.Combine(scratch, "first.charm");
             List<SeasonGame> first;
             SeasonRotationOutcome firstRotation;
-            using (var store = HistoryStore.Open(firstPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(firstPath, mte))
                 first = BuildSeasonSchedule(mte, MteCheckSeed, store, deferNumbering: true,
                                             out _, out firstRotation);
             Check("C1d: ★ SEASON ONE OF A CAREER IS THE SAME SCHEDULE. No log can exist, so the chooser " +
@@ -175,7 +175,7 @@ internal static partial class Program
             List<SeasonGame> afterUnlogged;
             SeasonRotationOutcome unloggedRotation;
             SeasonMemoryOutcome unloggedMemory;
-            using (var store = HistoryStore.Open(unloggedPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(unloggedPath, mte))
                 afterUnlogged = BuildSeasonSchedule(mte, MteCheckSeed, store, deferNumbering: true,
                                                     out unloggedMemory, out unloggedRotation);
             Check("C1f: ★ ZERO USABLE HISTORY MUST NOT CHANGE THE SCHEDULE. Season two of a career whose " +
@@ -326,7 +326,7 @@ internal static partial class Program
                 // Damage season 4 — the one and only season the HOSTS may read.
                 RotationCorruptLog(damagedPath, 4);
                 SeasonMemoryOutcome dm; SeasonRotationOutcome dr;
-                using (var store = HistoryStore.Open(damagedPath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(damagedPath, rot))
                     BuildSeasonSchedule(rot, RotationCheckSeed, store, deferNumbering: true, out dm, out dr);
                 Check("C5a: ★ N-1 DAMAGED — the hosts fail closed as a whole (S96's rule, untouched) while " +
                       "the rotation carries on reading N-2..N-W. The two failure rules differ across " +
@@ -341,7 +341,7 @@ internal static partial class Program
                 for (var s = 0; s < 4; s++) PlayRetainedSeason(rot, RotationCheckSeed, holePath, configPath);
                 RotationCorruptLog(holePath, 2);
                 SeasonMemoryOutcome hm; SeasonRotationOutcome hr;
-                using (var store = HistoryStore.Open(holePath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(holePath, rot))
                     BuildSeasonSchedule(rot, RotationCheckSeed, store, deferNumbering: true, out hm, out hr);
                 Check("C5b: a hole at N-3 leaves the hosts entirely unaffected and never disables its " +
                       "neighbours in the rotation window",
@@ -355,7 +355,7 @@ internal static partial class Program
                 for (var s = 1; s <= 3; s++) RotationCorruptLog(allGonePath, s);
                 SeasonMemoryOutcome am; SeasonRotationOutcome ar;
                 List<SeasonGame> allGone;
-                using (var store = HistoryStore.Open(allGonePath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(allGonePath, rot))
                     allGone = BuildSeasonSchedule(rot, RotationCheckSeed, store, deferNumbering: true,
                                                   out am, out ar);
                 Check("C5c: with every readable year unreadable the rotation is ABSENT and the slate is the " +
@@ -393,7 +393,7 @@ internal static partial class Program
                 var relaxPath = Path.Combine(scratch, "relax.charm");
                 for (var s = 0; s < 4; s++) PlayRetainedSeason(rot, RotationCheckSeed, relaxPath, configPath);
                 ConferenceSlate deepSlate;
-                using (var store = HistoryStore.Open(relaxPath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(relaxPath, rot))
                 {
                     var career = ReadCareerMemory(store, RotationWindowSeasons);
                     deepSlate = BuildConferenceSlate(
@@ -500,7 +500,7 @@ internal static partial class Program
                 var coexistPath = Path.Combine(scratch, "coexist.charm");
                 for (var s = 0; s < 3; s++) PlayRetainedSeason(rot, RotationCheckSeed, coexistPath, configPath);
                 ConferenceSlate withMemory, withoutMemory;
-                using (var store = HistoryStore.Open(coexistPath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(coexistPath, rot))
                 {
                     var career = ReadCareerMemory(store, RotationWindowSeasons);
                     withMemory = BuildConferenceSlate(
@@ -782,5 +782,6 @@ internal static partial class Program
         var at = bytes.Length / 2;
         bytes[at] = (byte)(bytes[at] ^ 0xFF);
         File.WriteAllBytes(path, bytes);
+        RelistCareerForCheck(historyPath);   // ★ S125 — saved that way, so the READER is what refuses it
     }
 }

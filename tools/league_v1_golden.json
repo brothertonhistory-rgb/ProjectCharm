@@ -1,0 +1,16 @@
+{
+  "format": "charm-league",
+  "schemaVersion": 1,
+  "historyId": "0123456789abcdef0123456789abcdef",
+  "season": 0,
+  "prestige": [
+    {
+      "schoolId": 1,
+      "value": 50
+    },
+    {
+      "schoolId": 2,
+      "value": 60
+    }
+  ]
+}

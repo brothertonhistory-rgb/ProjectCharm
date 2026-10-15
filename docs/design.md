@@ -9131,27 +9131,50 @@ The stock career's season one: 4,511 roster entries, 5,357 blocks (103 overtime 
 22,940,788 bytes (21.9 MiB)**; a forty-year career ≈ 875 MiB. The row count is exactly the season page's seat-occupancy figure:
 the two populations coincide, so every man who held a seat played at least one possession.
 
-### History schema v3 — the lineage label and the year the career began
+### History schema v4 — the career file lists what it owns and carries its own fingerprint
 
-Keys, in this order: `format`, `schemaVersion` (3), `historyId`, `worldFingerprint`, **`startYear`**,
-`nextPersonId`, `nextSeasonId`, `nextGameId` — pinned byte for byte by `tools/history_v3_golden.json`
-(Phase 80 B10; hand-written at S119, so the writer is compared with an independent expectation).
+Keys, in this order: `format`, `schemaVersion` (4), `historyId`, `worldFingerprint`, `startYear`,
+`nextPersonId`, `nextSeasonId`, `nextGameId` — the v3 keys, unchanged and still at the root — then **`files`**,
+**`seasons`**, **`progress`**; 2-space indent, LF, UTF-8 without a BOM, one final newline, and then **one more line,
+`sha256:<64 lowercase hex>`**, taken over the exact bytes before it. Pinned byte for byte by
+`tools/history_v4_golden.json`, and the league state it lists by `tools/league_v1_golden.json` (Phase 80 B10; both
+hand-written at S125, computed outside the C# writer).
 
 - **`historyId` (S90).** A v1 history bound only to a **world**, and two careers from one world
   legally share the fingerprint and both start at person 1, season 1, game 1 — so a log copied
   between them passed every check. 128 random bits, minted once at creation, 32 lowercase hex.
 - **`startYear` (S119).** The civil year the career's first season opens in, 1..9998, written once at
   creation and never again; season N is `startYear + (N − 1)`. A stored year outside 1..9998 is damage
-  (`YearOutOfDomain`). The bounds and the 2026 default are restated in `HistoryStateV3` because the
+  (`YearOutOfDomain`). The bounds and the 2026 default are restated in `HistoryStateV4` because the
   history assembly references nothing; Phase 110 pins both against the calendar and the season default.
-- **A history created today is born v3.** No older version is ever written at any instant.
-- **v1 (pre-S90) and v2 (S90–S118) files are refused by name, never upgraded** (C-60; v1 at S118.2,
-  v2 at S119): *"this career was saved by an older version of the game — start a new career"*,
-  classified `UnsupportedVersion`. A v2 career has no start year, and guessing 2026 would be a quiet
-  call about somebody's career. The version is peeked first, so the refusal names the real reason,
-  and it comes before any write — the file is left byte-identical and no season-log folder can exist.
-  Phase 80 B10 and Phase 81 A6 prove it for both, and B10 also proves the sentence belongs to the older
-  career alone — a version-7 file is refused without it.
+- **`files` (S125).** Every file the career owns, `{ path, sha256 }`, sorted by path. **Paths are name-free** —
+  `events/season-N.json`, `gamelog/season-N.log` (and `.log.inprogress`, `.scout`), `league/league-N.json` — resolved
+  next to the career file: `s125-career.json` keeps its logs in `s125-career.gamelog/`. So the career file's bytes do not
+  depend on what the file is called.
+- **`seasons` (S125).** One entry per published season, `{ season, rules: [ { fromDay, configSha256, rulesStamp } ] }`:
+  the season's first legal day, the SHA-256 of `config.json` as read, and the build stamp (SHA-256 over the on-disk bytes
+  of `Charm.Engine`, `Charm.History` and `Charm.Harness`). **A build-identity record, not a compatibility proof** — any
+  rebuild that moves a byte changes the stamp, and an equal stamp says nothing about worlds or settings; Debug and Release
+  stamp differently. Nothing reads it yet; B2's "a different build refuses a mid-season save" (Q8) will.
+- **`progress` (S125).** Reserved, always `null`: B2 fills it without a format change. Anything else is refused.
+- **The trailer** proves the bytes are what the writer wrote. A file without one, or whose hash does not match, is
+  **torn** (`Torn`) — half-written or edited by hand — and is never half-read: it is recovered from the backup when the
+  backup is whole, and refused by name otherwise.
+- **The contract** proves the bytes make sense: one set of rules, `HistorySchemaV4.ValidateContract`, each refusal with its
+  own error. Every path one of the five kinds, canonical, `/`-separated — which by construction refuses an absolute path,
+  a `..`, a `\`, the career file, its backup, its lock and anything set aside (`ListedPathInvalid`); no path twice,
+  compared ignoring case (`ListedPathDuplicate`); every hash 64 lowercase hex (`ListedHashInvalid`); `seasons` exactly 1
+  through the last published, each with at least one rules entry, days well-formed and increasing (`SeasonsInvalid`);
+  every listed file naming a published season, and `league-0` always listed (`ManifestMismatch`); `progress` null
+  (`ProgressNotNull`). B2 extends it.
+- **A history created today is born v4.** No older version is ever written at any instant.
+- **v1 (pre-S90), v2 (S90–S118) and v3 (S119–S124) files are refused by name, never upgraded** (C-60; v3 at S125):
+  *"this career was saved by an older version of the game — start a new career"*, classified `UnsupportedVersion`. The
+  version is peeked before the trailer is looked for, so an older career is refused for being older rather than called
+  torn; the refusal comes before any write — the file byte-identical, no season-log folder. Phase 80 B10 and Phase 81 A6
+  prove it for all three, and B10 that the sentence belongs to the older career alone — a version-7 file is refused
+  without it. Phase 116 C4 refuses a career written by the S124 build itself (`tools/history_v3_career/`) at `season` and
+  at each of the five pages.
 - **What it does not prove:** a history *cloned* at the filesystem carries its label, so those
   branches are indistinguishable. That is the same trust boundary S89 already draws, since a
   clone also duplicates every counter. Branch detection is save-branch management.
@@ -9863,19 +9886,19 @@ Canonical form is specified once, in `HistorySchemaV2.Serialize`, and pinned by 
 
 `Next*` means **next unissued**: every value below it is permanently unavailable, and the stored value itself has not been handed out yet.
 
-**The loader is as strict as the world loader**, and a save file deserves it more: a misread world produces a wrong league, a misread history produces two men with one number. Every refusal is classified by a `HistoryError` code (tests assert the code, never the message text): `MalformedJson`, `MissingKey`, `DuplicateKey`, `UnknownKey`, `WrongFormat`, `WrongType`, `UnsupportedVersion`, `CounterOutOfDomain`, `FingerprintMismatch`, `PathIsDirectory`, `LockUnavailable`, `PersistFailed`, `NegativeCount`, `ExhaustedRange`, `InvalidIdentity`, `MissingIdentity`. **A parse failure is NEVER treated as "no file"** — starting fresh at 1 on top of a corrupt-but-real history reissues every number in it.
+**The loader is as strict as the world loader**, and a save file deserves it more: a misread world produces a wrong league, a misread history produces two men with one number. Every refusal is classified by a `HistoryError` code (tests assert the code, never the message text): `MalformedJson`, `MissingKey`, `DuplicateKey`, `UnknownKey`, `WrongFormat`, `WrongType`, `UnsupportedVersion`, `CounterOutOfDomain`, `FingerprintMismatch`, `PathIsDirectory`, `LockUnavailable`, `PersistFailed`, `NegativeCount`, `ExhaustedRange`, `InvalidIdentity`, `MissingIdentity` — and since S125 the career file's own: `Torn`, `ListedFileMissing`, `ListedFileChanged`, `BackupUnusable`, `ListedPathInvalid`, `ListedPathDuplicate`, `ListedHashInvalid`, `SeasonsInvalid`, `ManifestMismatch`, `ProgressNotNull`, `LeagueStateInvalid`, `LeagueStateMismatch`, `ListedNameTaken` (see "The career file is trustworthy"). **A parse failure is NEVER treated as "no file"** — starting fresh at 1 on top of a corrupt-but-real history reissues every number in it.
 
 ### The allocator — high-water, never a free list
 
 There is no record of which numbers were issued and no way to hand one back. The three counters ARE the proof: every value below a counter is spent, full stop, whether it ended up on a person or was burned by a season that failed to build. A scheme that filled holes would have to KNOW which numbers were free, which means a list, which means the list can be wrong — and a wrong list means two men sharing a career. Holes are permanent and cost nothing.
 
-**Numbers are held until the season closes (S124, B1a).** A reservation moves the counters in memory and writes nothing; `PublishReservations()` writes them, atomically, as the **last** write of a season's close. A store disposed without publishing has issued nothing — its numbers were never on disk, and the next open hands the same numbers out again in the same order. That reverses S89's "reserve → make durable → hand out", and it is safe for one reason that must stay true: **a held number reaches disk only inside the season's own files, which are written at the close before the counters**, and a close that did not finish has its files set aside before the next close writes (see "A season leaves no trace until it closes"). So no published file ever holds a number that is later handed out again — S89's "reissuing one is fatal" still holds of every *published* number. `PublishReservations()` is the transitional v3 season-close publication; B1b replaces it with the career's save transaction.
+**Numbers are held until the season closes (S124, B1a).** A reservation moves the counters in memory and writes nothing; the season's **save** (`PublishSeason`, S125) writes them, with the season's file list, as the **last** write of the close. A store disposed without publishing has issued nothing — its numbers were never on disk, and the next open hands the same numbers out again in the same order. That reverses S89's "reserve → make durable → hand out", and it is safe for one reason that must stay true: **a held number reaches disk only inside the season's own files, which are written at the close before the counters**, and a close that did not finish has its files set aside before the next close writes (see "A season leaves no trace until it closes"). So no published file ever holds a number that is later handed out again — S89's "reissuing one is fatal" still holds of every *published* number. (S125 replaced S124's counters-only publication with the save described in "The career file is trustworthy".)
 
 Arithmetic is checked and half-open: `start = next`, `end = next + n`, hold `end`, issue `[start, end)`. An oversized batch rejects the **whole** reservation with the counters untouched — never a partial advance. A zero reservation is a no-op.
 
-**The lock is a sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and **held for the whole season** — load, validation, every reservation, play, and the close's publish — until the store is disposed (S124). `CloseReservations()` ends reservations and keeps the lock; nothing reopens them, so one store serves one season. The cost, accepted at S124: a career's pages (`people`, `player`, `gamelog`, `box`, `day`) refuse while that career's season is being played in another window.
+**The lock is a sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and **held for the whole season** — load, validation, every reservation, play, and the close's save — until the store is disposed (S124). `CloseReservations()` ends reservations and keeps the lock; nothing reopens them, so one store serves one season. The cost, accepted at S124: a career's pages (`people`, `player`, `gamelog`, `box`, `day`) refuse while that career's season is being played in another window.
 
-**Never a fallback.** If the counters cannot be published — read-only folder, full disk — the season is not published and is played again next run; another process holding the lock refuses the run before anything plays. Durability is claimed against ordinary process failure and normal atomic filesystem behaviour; not against a machine losing power mid-write.
+**Never a fallback.** If the save cannot be made — read-only folder, full disk — the season is not published and is played again next run; another process holding the lock refuses the run before anything plays. Durability is claimed against ordinary process failure and normal atomic filesystem behaviour; not against a machine losing power mid-write.
 
 ### Where numbers are issued, and in what order
 
@@ -12855,32 +12878,40 @@ Finish            checks everything in memory first (every log block, the record
                     2  the log (when the season keeps one)               Create, every block, Finalize
                     3  the scouting file (when the season has hidden state)
                     4  the event record, written once                    MteWriteRecord
-                    5  the career file's counters                        PublishReservations   ← the commit
+                    5  the season's league state (S125)                  WriteLeagueState
+                    6  THE SAVE (S125): every file above listed by hash,  PublishSeason         ← the commit
+                       the rules recorded, .new written, one swap with
+                       the previous save kept as the backup
 ```
 
-★ **The commit boundary.** The publish is the last step that can fail. Once the career file has been replaced the season
-is committed — the counters on disk are the only thing that says a season happened, and the next run reads them, not
-this run's exception. An exception from the publish means the career file was not replaced (a temp file, then one
-rename). So:
+Before step 1 the league state on disk is checked against the world (S125, the B1 equality assertion).
+
+★ **The commit boundary.** The save is the last step that can fail. Once the career file has been replaced the season
+is committed — the career file is the only thing that says a season happened, and the next run reads it, not this run's
+exception. An exception from the save means the career file was not replaced (`.new`, then one `File.Replace`; on
+Windows a replace can fail after moving the old file to the backup name, which the next open recovers to the previous
+save — the season did not happen). So:
 
 - **stopped while it plays** → the career is exactly as it was; the next run plays the same season from November 1, and
   in fixed dice it comes out identical;
-- **stopped while it closes, before step 5** → some of the season's files are on disk but the career file says the season
+- **stopped while it closes, before step 6** → some of the season's files are on disk but the career file says the season
   never happened; the next run's close sets them aside and writes fresh ones;
-- **stopped after step 5** → a committed season; the next run plays the season after and sets nothing aside.
+- **stopped after step 6** → a committed season; the next run plays the season after and sets nothing aside.
 
-★ **The set-aside — a temporary v3 recovery rule.** The close's first step moves every recognised file of a season ≥ the
+★ **The set-aside — a temporary recovery rule.** The close's first step moves every recognised file of a season ≥ the
 pending one into `career.orphans/` (named for the history file, like `.events` and `.gamelog`), keeping its relative
-path, with `.1`, `.2` … on a name already taken. Recognised means exactly four kinds, canonical names only:
-`career.events/season-N.json`, `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`. The rule is
-exact for v3, not a heuristic: the counters are published last and one writer holds the lock, so such a file was written
+path, with `.1`, `.2` … on a name already taken. Recognised means exactly five kinds, canonical names only:
+`career.events/season-N.json`, `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`, and (S125)
+`career.league/league-N.json` — `league-0` is never moved, since N is at least 1. None of them is listed: each belongs to a
+season the current save has not published. The rule is exact, not a heuristic: the save is written last and one writer
+holds the lock, so such a file was written
 by a close that did not finish, or placed by hand — and no reader can reach it, because every reader computes the path
 of an EARLIER season and none lists a folder. Two invariants that carry into B1c: **a set-aside file is never deleted or
-changed** (moved, byte for byte), and **nothing but the four kinds is moved** — lock sidecars (reused by design, S90),
+changed** (moved, byte for byte), and **nothing but the five kinds is moved** — lock sidecars (reused by design, S90),
 temp files and anything else stay exactly where they are. A file that cannot be moved **refuses the close by name**, with
 nothing published. A run that set something aside prints one line saying what; otherwise the page is unchanged. **It is
 transitional:** it infers ownership from names and counters; B1c replaces the inference with the career's own file list
-and retires it.
+(S125) and retires it.
 
 ★ **Refusals print, they do not crash.** The close's two new refusals — a file that cannot be set aside, a record that
 cannot be written — are raised as errors the `season` command prints as `SEASON ERROR`, so a disk failure at the close is
@@ -12892,8 +12923,10 @@ the set-up — O-136.)
 season whose close failed cannot be followed by another on the same open store; its held numbers die with the store.
 
 ★ **The test seam.** `SeasonRunOptions.CloseStepForTest` is called with a step name before each close step (`set-aside`,
-`log`, `log-open` — after the log is created, before its blocks — `scouting`, `record`, `counters`) and just after the
-publish (`published`). A check throws from it to stop the close there. Null on every production path; nothing in
+`log`, `log-open` — after the log is created, before its blocks — `scouting`, `record`, `league` (S125), `counters` — the
+save) and just after it (`published`). S125 added two throw hooks inside the store, for steps a harness step cannot reach:
+`HistoryStore.UsePublishStepForTests` (`new-written`: `.new` flushed, the swap not made) and `UseRecoveryStepForTests`
+(`primary-set-aside`, `new-written`). A check throws from it to stop the close there. Null on every production path; nothing in
 production reads it.
 
 ### How Phase 115 proves it
@@ -12911,12 +12944,112 @@ and a child whose close is blocked is shown to fail that verdict. **No number pu
 never touched; a blocked `career.orphans` refusing by name with nothing published. **The close's order**, observed at
 every step, with a one-byte control.
 
+### The career file is trustworthy (S125 — save design, phase B1b)
+
+★ **What it buys.** Until S125 the career file held three counters and nothing else: a damaged, missing or hand-edited
+season file was noticed only if a reader happened to open it, a half-written career file was half-read, and a save kept
+nothing to fall back on. Now the career file lists every file the career owns with each one's SHA-256 and carries a
+fingerprint line of its own (the format: "History schema v4"), **a save is one step and keeps the previous save as a
+backup**, and a torn career file is recovered from that backup. Mid-season saving (B2) stands on it.
+
+★ **The three ways to publish** (`HistoryStore`; brief §4b).
+
+- **Creation** — only when the folder holds neither the career file nor `career.json.bak` (either one means an existing
+  career). A `league-0` left by a creation that died is set aside into the orphans folder — it is unlisted, nothing ever
+  read it, and it may be another lineage's — then `league-0` is written, then `career.json.new` listing it, flushed, then
+  moved into place **without overwriting**. Stopped before the move, the next open finds no career file and no backup and
+  creates again: a new lineage, which is what a career that never had a published file is.
+- **A save** — `PublishSeason(newFiles, rules)`. The close has already written the season's files under their final names;
+  the store hashes each and adds it to the list (refusing by name, `ListedNameTaken`, a name already listed), adds the
+  season's rules entry, checks the contract, writes `.new`, flushes, then `File.Replace(.new, career file, .bak)`.
+  **`File.Replace` runs only when this process loaded and verified the current career file**, so the backup is always the
+  last good save. The first save of a career makes the first backup. A save that moves no season — the suite's hand
+  reservations — passes no rules; one that moves a season must pass them; more than one season per save is refused.
+- **Recovery** — when the career file is missing or torn and the backup **verifies whole** (its own trailer, the contract,
+  and every file it lists). The torn file, if any, is moved to the orphans folder; the backup is **copied** to `.new` and
+  the copy read back; `.new` is moved into place without overwriting. **The backup is never touched**, so a recovery
+  stopped at any step leaves "no career file, a whole backup", and the next open runs the same recovery. Afterwards the
+  career file and the backup are identical; the next save makes a new backup. The open reports it, and the `season`
+  command and the pages print it. `.new` is never authoritative — overwritten before use, ignored on load.
+
+★ **Loading.** A career file that verifies — trailer, contract, every listed file's hash — loads, and opening it writes
+nothing. Missing or torn, with a backup that verifies whole: recovered, and said so. Missing or torn, with a backup that is
+missing, torn, or lists a file that is missing or changed: refused by name (`Torn` with no backup, `BackupUnusable` with
+one), nothing written. **A career file that verifies but lists a file that is missing or changed is refused by name
+(`ListedFileMissing`, `ListedFileChanged`) and never rolled back to the backup** — Q6: the backup is for a torn career
+file, not a damaged season. A v1, v2 or v3 file: the C-60 sentence. No career file and no backup: a new career. **A backup
+with no career file is never a new career** — it is an existing career with a lost career file, recovered. The verified
+list (`CareerFiles`) and the seasons are exposed read-only on the store; **no reader takes its paths from them yet, and
+nothing is quarantined at load** — that is B1c.
+
+★ **The cost of verifying.** Every open reads every listed file. A two-season fixture-mte career is 3.75 MB, 14 ms an open
+on Emmett's machine. A stock season is about 26 MB (the log about 23 MB, the scouting file about 3 MB) — the B1b prompt's
+"about 1.2 MB" was low by twenty times — so a long stock career's open grows by that much a season. Phase 114 (stock
+careers, many opens) runs 288.1s on the S125 build against 289.3s on S124's, alternated on one machine: not measurable yet.
+
+★ **K8 — a listed file is never modified.** A file the current save or its backup lists is never written to, renamed or
+deleted by the game; new content goes under a name no listed file holds, and a save that fails leaves both saves loadable.
+B1b keeps it by construction — every season file is written once under a new name, each writer refuses an existing name,
+and the save refuses a name already listed. **B2 must keep it:** the live log, when it comes, is an unlisted working file
+until the close (Q5, S123).
+
+★ **The league state** (`LeagueStateFile`; brief §6). `career.league/league-N.json` —
+`{ format: "charm-league", schemaVersion: 1, historyId, season: N, prestige: [ { schoolId, value } … ] }`, sorted by
+school, the canonical JSON discipline; read back only if its bytes equal their own re-encoding and its lineage and season
+match. **Its one fact is prestige by school, copied from the world.** `league-0` is born with the career; `league-N` is
+written at season N's close, between the event record and the save, and listed. **At every open and every close the
+harness asserts the latest league state equals the world's `CurrentPrestige` for every school** (`AssertLeagueMatchesWorld`;
+`LeagueStateMismatch`, naming the school), so the two copies cannot disagree. Nothing plays from it: the world stays the
+authority until phase C, when the league state becomes the authority for prestige, the season-path readers are rerouted
+and the assertion retires. The store cannot see a world, so the harness hands the pairs in — at creation through `Open`'s
+`leagueIfNew` (read only when a career is created), at the close through `WriteLeagueState`. **Every career opener goes
+through `OpenCareer(path, world)`** — the `season` command, the five pages and every suite check; the store-level checks
+that hand-build careers call `HistoryStore.Open` directly and name the league they mean.
+
+★ **Pins that hold on any machine.** A v4 career file lists the hash of the season log and the scouting file, and both
+store decimals as raw bits, some through library math that is not bit-portable between Windows and Linux (CONVENTIONS §2,
+S81.3). So a career-file pin is a **portable digest** (`PortableCareerDigest`): the payload with every `gamelog/` hash
+masked — the numbers spent, the rules, every listed path and the integer-only files' hashes all stay. The masked files are
+pinned by their decoded blocks and compared byte for byte on one machine. Under the fixed-rules seam
+(`HistoryStore.UseFixedRulesForTests`, on the same terms as the fixed history id) the pins are Phase 113 C2c and Phase 114
+C4b `29a10651…` (two stock seasons) and Phase 114 C4g `de270510…` (one) — the same on Emmett's machine as in the sandbox.
+
+★ **The readers' own refusals, kept.** Since S125 a season file damaged after its save is refused at the career's open,
+before any reader runs. The readers' refusals still matter — they catch a file that was *saved* wrong, which no hash can —
+so the checks that plant a damaged or older file to prove a reader refuses it re-seal the career around it
+(`RelistCareerForCheck`: every listed file re-hashed at its current bytes, a missing one dropped, the career file
+re-sealed), making the damage look saved that way. A check-only helper; the store has no such door.
+
+### How Phase 116 proves it
+
+On fixture-mte under the fixed history id. **No change:** two seasons through the new close — every game block and both
+event records are the S124 build's (a portable digest captured from it, `93fd6f4c…`), and the numbers spent are its
+(426 / 3 / 783). **The list is true:** after each close it names exactly the files on disk outside the lock sidecars, the
+backup and the orphans folder (5, then 9), every hash matching; each season records one rules entry — its first legal day,
+the settings hash, this build's stamp; a listed file deleted, and one with one byte changed, are each refused by name at the
+next open and by the `season` command before any season plays, nothing written; control — an unlisted file changed is never
+refused. **The save, the backup and recovery:** the first save stopped after `.new` is written leaves the career file
+byte-identical with no backup, and a fresh process plays the season again identical, career file and backup included; a
+later save stopped the same way leaves both saves as they were; after two closes the backup is season one's save; a torn
+career file is recovered, the torn file kept byte for byte, the career file and the backup identical; a recovered career
+whose lost save had published season two sets season two's files aside and plays it again identical, through the `season`
+command; both torn, and a whole backup with a listed file gone, are refused (`BackupUnusable`) with nothing written; a
+recovery stopped after the torn file is set aside, and after `.new` is written, is finished by the next open; a valid career
+with a damaged log is refused and not rolled back; a stray `.new` is ignored and replaced; a listed name is refused (K8).
+**Creation:** a stray `league-0` and `.new` from a creation that died are set aside and a new career created; a backup with
+no career file is recovered, never re-created. **The contract:** eight malformed lists, each re-sealed with a correct
+trailer, refused by their own errors; control — re-sealed unchanged, it loads. **Older careers:** the S124 build's v3
+career refused by name at `season` and the five pages, untouched. **The league state:** born and written equal to the
+world for all 26 schools; a world edited in memory after the career is open refused by name at the open check and at the
+close, before a single write.
+
 ### How Phase 113 proves it
 
 The order: every game once, dates never backwards, no school twice a day, on two stock seasons and an mte season, with
-the old order as the control. Nothing moved: season one's every game block, its event record and the career file
-pinned from the S121 build (whole numbers only — the roster section and the scouting file hold raw double bits, so the
-cross-platform pin stops there, CONVENTIONS §2); and on the machine that runs it, the same two-season career played on
+the old order as the control. Nothing moved: season one's every game block and its event record pinned from the S121
+build, and the career file after two seasons — re-pinned at S125 as v4, under fixed rules, by its portable digest
+`29a10651…` (whole numbers only — the roster section and the scouting file hold raw double bits, so the cross-platform
+pin stops there, CONVENTIONS §2); and on the machine that runs it, the same two-season career played on
 the calendar and in the old order writes every file byte for byte, with a one-byte control. Every day's games are the
 games dated that day. Later rounds dated and played after their feeders; every tournament seeded after its league's
 last game onto the field the national record gives; a too-early tournament and a same-day feeder refused by name. The

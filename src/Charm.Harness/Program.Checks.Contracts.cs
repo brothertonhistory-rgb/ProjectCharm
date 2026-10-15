@@ -223,7 +223,7 @@ internal static partial class Program
             var tinyFp = WorldFingerprint(tiny);
 
             SeasonRunOutcome season1;
-            using (var store = HistoryStore.Open(careerPath, tinyFp))
+            using (var store = OpenCareer(careerPath, tiny))
                 season1 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             var rec1 = MteRecordPathFor(careerPath, 1);
             var rec1Text = File.ReadAllText(rec1);
@@ -244,9 +244,10 @@ internal static partial class Program
                 $"        {{ \"legId\": 3, \"order\": 3, \"site\": \"Home\", \"hostId\": {schoolA.Id}, \"status\": \"Outstanding\" }}\n" +
                 "      ]\n    }\n  ]";
             File.WriteAllText(rec1, rec1Text.Replace("\"liveContracts\": []", authored));
+            RelistCareerForCheck(careerPath);   // ★ S125 — a record authored by hand, listed as if saved that way
 
             SeasonRunOutcome season2;
-            using (var store = HistoryStore.Open(careerPath, tinyFp))
+            using (var store = OpenCareer(careerPath, tiny))
                 season2 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store,
                                         contractChoiceOverride: new Dictionary<int, int> { [7] = 2 },
                                         bootstrapPeopleForTest: true);
@@ -331,7 +332,8 @@ internal static partial class Program
             {
                 ContractLoad Read()
                 {
-                    using var store = HistoryStore.Open(careerPath, tinyFp);
+                    RelistCareerForCheck(careerPath);   // ★ S125 — each planted record saved that way; the READER judges it
+                    using var store = OpenCareer(careerPath, tiny);
                     return ReadLiveContracts(store, 3);
                 }
                 Check("C10a: the current version loads whole",
@@ -366,8 +368,9 @@ internal static partial class Program
 
             // C4 — inheritance with season 1's record deleted: the read is EXACTLY N-1.
             File.Delete(rec1);
+            RelistCareerForCheck(careerPath);   // ★ S125 — a year the save never kept
             SeasonRunOutcome season3;
-            using (var store = HistoryStore.Open(careerPath, tinyFp))
+            using (var store = OpenCareer(careerPath, tiny))
                 season3 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             Check("C4: ★ season 3 inherits the exact surviving state from season 2's record with " +
                   "season 1's record GONE — the boundary is the real reader/writer pair and the " +

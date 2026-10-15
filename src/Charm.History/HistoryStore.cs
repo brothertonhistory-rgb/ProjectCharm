@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 
 namespace Charm.History;
 
@@ -11,40 +12,51 @@ namespace Charm.History;
 //  was burned by a season that failed to build. Holes are permanent and cost
 //  nothing — there are more numbers than there will ever be careers.
 //
-//  This is the whole reason a discarded player can never come back as somebody
-//  else. A scheme that filled holes would have to KNOW which numbers were free,
-//  which means a list, which means the list can be wrong.
-//
 //  ★ S124 — NUMBERS ARE HELD UNTIL THE SEASON CLOSES (B1a, K1). A reservation
-//  moves the in-memory counters and writes nothing; `PublishReservations` makes
-//  them durable, once, as the LAST write of a season's close. A store disposed
-//  without publishing has issued nothing: its numbers were never on disk.
+//  moves the in-memory counters and writes nothing; the season's close makes them
+//  durable, once, as its LAST write. A store disposed without publishing has
+//  issued nothing: its numbers were never on disk. A held number reaches disk only
+//  inside the season's own files, written at the close BEFORE the career file; if
+//  the close does not finish, the next close sets every file of that season or
+//  later aside before it writes. So no published number is ever handed out again.
 //
-//  This reverses S89's "reserve -> make durable -> hand out" order, and the
-//  reversal is safe for one reason that must stay true: a held number reaches
-//  disk only inside the season's own files, and those are written only at the
-//  close, BEFORE the counters. If the close does not finish, the counters still
-//  say that season is unplayed, and the next close sets every file of that season
-//  or later aside (`career.orphans/`) before it writes. So no published file ever
-//  holds a number that is later handed out again. (S89 said "losing a range to a
-//  crash is free; reissuing one is fatal" — still true of a PUBLISHED number,
-//  which is never reissued.)
+//  ★ S125 — THE CAREER FILE IS THE AUTHORITY (B1b). It lists every file the career
+//  owns with each one's SHA-256, carries a fingerprint of its own (a trailer), and
+//  is published in exactly three ways (brief §4b):
 //
-//  `PublishReservations` is the transitional v3 season-close publication, not the
-//  career's save transaction: B1b replaces it with the manifest swap.
+//    CREATION  — the folder holds neither the career file nor its backup. A stray
+//                `league-0` from a creation that died is set aside; then league-0
+//                is written, then `.new` listing it, then `.new` is moved into
+//                place WITHOUT overwriting.
+//    A SAVE    — `PublishSeason`: the season's files are already written under
+//                names no listed file holds; the store hashes them, writes `.new`,
+//                and `File.Replace(.new, career file, .bak)`. Called only when this
+//                process loaded and verified the current career file, so `.bak` is
+//                always the last good save.
+//    RECOVERY  — the career file is missing or torn and `.bak` verifies WHOLE (its
+//                trailer, the contract, and every file it lists): the torn file
+//                moves to the orphans folder, `.bak` is copied to `.new` and the
+//                copy verified, `.new` moves into place without overwriting. `.bak`
+//                is never touched, so an interruption at any step leaves "no career
+//                file + a whole backup", and the next open runs the same recovery.
 //
-//  ★ THE LOCK IS A SIDECAR, NOT THE FILE ITSELF. Holding the data file open
-//  exclusively and then atomically replacing that same file does not work on
-//  Windows — the replace needs the file not to be held. So the lock is a
-//  separate `.lock` file next to it, taken FIRST, before existence is even
-//  checked (checking first is the creation race), and held across load,
-//  validation, every reservation, and every replacement. ★ S124 (K2): it is held
-//  for the whole season, through play, until the store is disposed.
+//  `.new` is never authoritative: overwritten before use, ignored on load.
 //
-//  ★ NEVER A FALLBACK. If the file cannot be made durable — read-only folder,
-//  full disk, another process holding the lock — the season is not published
-//  and the run stops. A season whose counters cannot be published is played
-//  again next run, never kept on the side.
+//  ★ K8 — A FILE THE CURRENT SAVE OR `.bak` LISTS IS NEVER WRITTEN TO, RENAMED OR
+//  DELETED BY THE GAME. New content goes under a name no listed file holds, and a
+//  save that fails leaves both saves loadable. A save that would list a name already
+//  listed is refused by name.
+//
+//  ★ Q6 — a career file that verifies but lists a file that is missing or changed is
+//  REFUSED BY NAME, never rolled back to `.bak`: the backup is for a torn career
+//  file, not for a damaged season.
+//
+//  ★ THE LOCK IS A SIDECAR, NOT THE FILE ITSELF (S89): replacing a file that is held
+//  open does not work on Windows. It is taken FIRST, before existence is checked,
+//  and (S124 K2) held until the store is disposed.
+//
+//  ★ NEVER A FALLBACK. If the career file cannot be made durable the season is not
+//  published and the run stops; it is played again next run.
 //
 //  Durability is claimed against ordinary process failure and normal atomic
 //  filesystem behaviour. Not against a machine losing power mid-write.
@@ -55,62 +67,94 @@ public sealed class HistoryStore : IDisposable
     private readonly string _path;
     private readonly string _lockPath;
     private FileStream? _lockHandle;
-    private HistoryStateV3 _state;
+    private HistoryStateV4 _state;
     private bool _reservationsClosed;
 
-    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV3 state)
+    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV4 state,
+                         IReadOnlyList<string> openReport)
     {
         _path = path;
         _lockPath = lockPath;
         _lockHandle = lockHandle;
         _state = state;
+        OpenReport = openReport;
     }
 
     /// <summary>The world this history is bound to. A history opened against a different
     /// world is refused, never silently rebound.</summary>
     public string WorldFingerprint => _state.WorldFingerprint;
 
-    /// <summary>This career lineage's label — 32 lowercase hex. Every retention log written
-    /// against this history carries it, which is what stops a log from one career being read
-    /// into another that happens to share a world.</summary>
+    /// <summary>This career lineage's label — 32 lowercase hex.</summary>
     public string HistoryId => _state.HistoryId;
 
     /// <summary>★ S119 — the civil year this career's FIRST season opens in, fixed at creation
     /// and read back off the file on every open. Season N is played in StartYear + (N - 1).</summary>
     public int StartYear => _state.StartYear;
 
-    // ★ The id source is a seam for ONE reason: the born-v3 golden. Production mints from
-    // Guid.NewGuid(), which by design produces a different file every run, so the suite could
-    // never pin a newly created history byte-for-byte against a fixture. Injecting a fixed id
-    // lets the suite drive the EXACT production writer and compare bytes — rather than the
-    // usual alternative, which is a hand-authored "expected" file that proves only that
-    // somebody typed what they expected. (S118.2: it was first opened for the v1-to-v2
-    // migration golden; the migration is retired, C-60, and this is what it is for now.)
-    private static Func<string> _idSource = HistorySchemaV3.MintHistoryId;
+    /// <summary>★ S125 — every file this career owns, verified at open (name-free paths, sorted).
+    /// No reader takes its paths from here yet (B1c).</summary>
+    public IReadOnlyList<ListedFile> CareerFiles => _state.Files;
 
-    /// <summary>Pin the lineage label for the duration of the returned scope.
-    ///
-    /// <para>★ PUBLIC, AND THAT IS A DELIBERATE WIDENING WORTH NAMING. Everything else in
-    /// this assembly is sealed against the harness on purpose. This one door is open because
-    /// the born-v3 golden has no other honest form: production mints from Guid.NewGuid(),
-    /// so creating a history produces a different file every run and could never be pinned
-    /// byte-for-byte. The alternative is a hand-authored "expected" file, which proves only
-    /// that somebody typed what they expected — it would not be driving the production
-    /// writer at all.</para>
-    ///
-    /// <para>It carries no raw identity value out, so S89's actual seam is untouched: this
-    /// sets a label, it does not expose a number. Nothing on a production path may call it.
-    /// Two callers in the tree: Phase 80 B10 (the born-v3 golden) and Phase 113 C2 (S122: a
-    /// two-season career pinned against the S121 build, and played twice — on the calendar and
-    /// in the old order — so the two can be compared byte for byte).</para></summary>
+    /// <summary>★ S125 — the published seasons and the rules each was played under.</summary>
+    public IReadOnlyList<SeasonEntry> Seasons => _state.Seasons;
+
+    /// <summary>★ S125 — what opening this career did besides loading it (a recovery from the
+    /// backup, a stray file set aside), one line each, for the caller to print. Empty when the
+    /// open only read.</summary>
+    public IReadOnlyList<string> OpenReport { get; }
+
+    // ★ The id source is a seam for ONE reason: goldens. Production mints from Guid.NewGuid(),
+    // which by design produces a different file every run.
+    private static Func<string> _idSource = HistorySchemaV4.MintHistoryId;
+
+    /// <summary>Pin the lineage label for the duration of the returned scope. Public, a deliberate
+    /// widening: it sets a label and exposes no number. Nothing on a production path may call it.</summary>
     public static IDisposable UseFixedHistoryIdForTests(string id)
     {
-        if (!HistorySchemaV3.IsCanonicalHistoryId(id))
+        if (!HistorySchemaV4.IsCanonicalHistoryId(id))
             throw new HistoryException(HistoryError.WrongType,
                 "a test history id must be 32 lowercase hex characters.");
         var previous = _idSource;
         _idSource = () => id;
         return new Restore(() => _idSource = previous);
+    }
+
+    // ★ S125 (K4) — the rules stamp changes with every build, so no golden of a career file could
+    // hold across sessions. The checks that pin a career file's bytes pin these two values instead.
+    private static (string ConfigSha256, string RulesStamp)? _fixedRules;
+
+    /// <summary>★ S125 — every season published inside the returned scope records these two values
+    /// in place of the real settings hash and build stamp. Same terms as the fixed history id: a
+    /// test seam, never called on a production path.</summary>
+    public static IDisposable UseFixedRulesForTests(string configSha256, string rulesStamp)
+    {
+        if (!HistorySchemaV4.IsLowerHex64(configSha256) || !HistorySchemaV4.IsLowerHex64(rulesStamp))
+            throw new HistoryException(HistoryError.WrongType, "fixed rules must be 64 lowercase hex each.");
+        var previous = _fixedRules;
+        _fixedRules = (configSha256, rulesStamp);
+        return new Restore(() => _fixedRules = previous);
+    }
+
+    private static Action<string>? _publishStepForTest;
+    private static Action<string>? _recoveryStepForTest;
+
+    /// <summary>★ S125 — a throw hook inside the save, at "new-written" (`.new` flushed, the swap
+    /// not yet made). Test seam only.</summary>
+    public static IDisposable UsePublishStepForTests(Action<string> step)
+    {
+        var previous = _publishStepForTest;
+        _publishStepForTest = step;
+        return new Restore(() => _publishStepForTest = previous);
+    }
+
+    /// <summary>★ S125 — a throw hook inside a recovery, at "primary-set-aside" (the torn career
+    /// file moved to the orphans folder) and "new-written" (the copy of `.bak` flushed and
+    /// verified, not yet moved into place). Test seam only.</summary>
+    public static IDisposable UseRecoveryStepForTests(Action<string> step)
+    {
+        var previous = _recoveryStepForTest;
+        _recoveryStepForTest = step;
+        return new Restore(() => _recoveryStepForTest = previous);
     }
 
     private sealed class Restore : IDisposable
@@ -124,49 +168,78 @@ public sealed class HistoryStore : IDisposable
     /// resolves to the same normalized path; symlink aliases are out of scope.</summary>
     public string Path => _path;
 
-    /// <summary>★ S96 — the season number the NEXT <see cref="ReserveSeason"/> will return.
-    ///
-    /// <para>A read, and only a read: no reservation, no counter movement, no write, no
-    /// schema or persisted-format change. It exists because host memory must know which
-    /// season is about to be scheduled BEFORE the schedule is built — and the schedule is
-    /// deliberately built before any number is spent (a slate that fails to build must not
-    /// have burned a season id), so the memory layer cannot wait for the reservation.</para>
-    ///
-    /// <para>★ THE CONTRACT, exactly, because the name understates it: while this run holds
-    /// the lock, the value returned here IS the value the next season reservation hands
-    /// back. `Reserve` reads this same counter as its start. That equality is what makes
-    /// "the previous career season is this minus one" arithmetic rather than a guess, and
-    /// Phase 87 C9 proves it by peeking and then reserving.</para>
-    ///
-    /// <para>Deliberately NOT a `SeasonId`: this is a counter reading, not an issued
-    /// identity, and wrapping it in the identity type would let a caller carry an
-    /// unreserved number around as though it had been allocated.</para></summary>
+    /// <summary>★ S96 — the season number the NEXT <see cref="ReserveSeason"/> will return. A read
+    /// only: while this run holds the lock, the value returned here IS the value the next season
+    /// reservation hands back. Deliberately NOT a `SeasonId`.</summary>
     public long PeekNextSeasonId => _state.NextSeasonId;
+
+    // ── Names ────────────────────────────────────────────────────────────────
+
+    /// <summary>A career's sibling folder of the given kind: the career file's path with `.json`
+    /// stripped, then `.kind` — `career.gamelog`, `career.events`, `career.league`,
+    /// `career.orphans`. The same rule the log, record and set-aside folders have always used.</summary>
+    public static string SiblingFolderFor(string historyPath, string kind)
+    {
+        var full = System.IO.Path.GetFullPath(historyPath);
+        if (full.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) full = full[..^5];
+        return full + "." + kind;
+    }
+
+    /// <summary>Where a listed (name-free) path lives on disk for the career at <paramref name="historyPath"/>.</summary>
+    public static string ResolveListed(string historyPath, string listed)
+    {
+        var slash = listed.IndexOf('/');
+        var kind = listed[..slash];
+        var rest = listed[(slash + 1)..];
+        return System.IO.Path.Combine(SiblingFolderFor(historyPath, kind), rest);
+    }
+
+    /// <summary>The listed path for a file on disk, or null when the file is not one a career owns.</summary>
+    private string? ListedPathOf(string fullPath)
+    {
+        var full = System.IO.Path.GetFullPath(fullPath);
+        var dir = System.IO.Path.GetDirectoryName(full);
+        var name = System.IO.Path.GetFileName(full);
+        foreach (var kind in new[] { "events", "gamelog", "league" })
+        {
+            if (!string.Equals(dir, SiblingFolderFor(_path, kind), StringComparison.Ordinal)) continue;
+            var listed = kind + "/" + name;
+            return HistorySchemaV4.ClassifyListedPath(listed) is null ? null : listed;
+        }
+        return null;
+    }
+
+    private static string BackupPathFor(string full) => full + ".bak";
+    private static string NewPathFor(string full) => full + ".new";
+
+    /// <summary>The SHA-256 of a file's bytes as they are on disk, lowercase hex.</summary>
+    public static string HashFile(string path)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Convert.ToHexString(SHA256.HashData(fs)).ToLowerInvariant();
+    }
 
     // ── Opening ──────────────────────────────────────────────────────────────
 
-    /// <summary>Take the lock, then load-or-create and verify.
+    /// <summary>Take the lock, then load (recovering a torn career file from its backup when the
+    /// backup is whole) or create, and verify.
     ///
-    /// <para>Opening an existing history writes nothing: validation is read-only, so a run
-    /// that fails before its first reservation leaves the file byte-identical.</para>
+    /// <para>Opening a career whose file verifies writes nothing. Every refusal happens before any
+    /// write, so a refused career is left exactly as it was.</para>
     ///
-    /// <para>★ S118.2 — a **v1** history (saved before S90) is refused by name, never upgraded
-    /// (Emmett's ruling C-60: the game is the product, not its save files). S90 to S118.1
-    /// upgraded one on open with a single migration write; that code is retired, and the
-    /// refusal happens before any write, so the old file is left exactly as it was.</para>
+    /// <para>★ v1, v2 and v3 careers are refused by name, never upgraded (C-60).</para>
     ///
-    /// <para>★ S119 — a **v2** history is refused the same way (it has no start year, and
-    /// guessing one would be a quiet call about somebody's career). A history CREATED here is
-    /// born v3: the lineage label and the first season's year exist before the first number is
-    /// issued. <paramref name="startYearIfNew"/> is read ONLY when the file does not exist yet;
-    /// an existing career's year comes off the file, never from the caller.</para></summary>
-    public static HistoryStore Open(string path, string worldFingerprint,
-                                    int startYearIfNew = HistoryStateV3.DefaultStartYear)
+    /// <para>★ S125 — <paramref name="leagueIfNew"/> is prestige by school, copied from the world,
+    /// and is read ONLY when a career is created: it becomes the career's `league-0`. An existing
+    /// career's league state comes off its files. <paramref name="startYearIfNew"/> likewise.</para></summary>
+    public static HistoryStore Open(string path, string worldFingerprint, IEnumerable<SchoolPrestige> leagueIfNew,
+                                    int startYearIfNew = HistoryStateV4.DefaultStartYear)
     {
-        if (!HistoryStateV3.IsStartYearInDomain(startYearIfNew))
+        if (!HistoryStateV4.IsStartYearInDomain(startYearIfNew))
             throw new HistoryException(HistoryError.YearOutOfDomain,
                 $"a career cannot start in {startYearIfNew.ToString(CultureInfo.InvariantCulture)} — " +
-                $"a season can start in {HistoryStateV3.MinStartYear}..{HistoryStateV3.MaxStartYear}.");
+                $"a season can start in {HistoryStateV4.MinStartYear}..{HistoryStateV4.MaxStartYear}.");
+        ArgumentNullException.ThrowIfNull(leagueIfNew);
 
         if (string.IsNullOrWhiteSpace(path))
             throw new HistoryException(HistoryError.PathIsDirectory, "history path is empty.");
@@ -204,67 +277,189 @@ public sealed class HistoryStore : IDisposable
 
         try
         {
-            HistoryStateV3 state;
-            if (File.Exists(full))
-            {
-                byte[] bytes;
-                try { bytes = File.ReadAllBytes(full); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    throw new HistoryException(HistoryError.PersistFailed,
-                        $"could not read history '{full}' — {ex.Message}", ex);
-                }
-                // A parse failure is NEVER treated as "no file". Starting fresh at 1 on top
-                // of a corrupt-but-real history reissues every number in it.
-                //
-                // The version is peeked FIRST, so an older career is refused for being older
-                // rather than for whatever key the current parser happens to trip on first
-                // (a v1 file would read as "missing key 'historyId'" — true, and completely
-                // misleading about what is wrong).
-                var version = HistorySchemaV3.PeekVersion(bytes);
-                if (version == HistoryStateV3.SchemaVersion)
-                {
-                    state = HistorySchemaV3.Parse(bytes);
-                }
-                else if (version is 1 or 2)
-                {
-                    // ★ S118.2 (v1) and S119 (v2), C-60 — refused by name, never upgraded.
-                    // Nothing has been written: the file is exactly as it was, and no log folder
-                    // exists, because the writer is constructed later from a store this line
-                    // never returns.
-                    throw new HistoryException(HistoryError.UnsupportedVersion,
-                        $"{GameLogSchemaV1.OlderVersionSentence} (history '{full}' is schemaVersion " +
-                        $"{version.ToString(CultureInfo.InvariantCulture)}; this build reads 3).");
-                }
-                else
-                {
-                    throw new HistoryException(HistoryError.UnsupportedVersion,
-                        $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
-                        "(this build reads 3).");
-                }
-
-                if (!string.Equals(state.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
-                    throw new HistoryException(HistoryError.FingerprintMismatch,
-                        $"this history belongs to a different world. History '{full}' is bound to " +
-                        $"{state.WorldFingerprint}, the world given is {worldFingerprint}.");
-            }
-            else
-            {
-                // First creation is an atomic publication too — never streamed straight
-                // to the final path, so a half-written history can never be found there.
-                // Born v3: the lineage label and the first season's year exist before the
-                // first number is issued.
-                state = HistoryStateV3.Fresh(_idSource(), worldFingerprint, startYearIfNew);
-                PublishAtomically(full, state);
-            }
-
-            return new HistoryStore(full, lockPath, lockHandle, state);
+            var report = new List<string>();
+            var state = LoadRecoverOrCreate(full, worldFingerprint, leagueIfNew, startYearIfNew, report);
+            return new HistoryStore(full, lockPath, lockHandle, state, report);
         }
         catch
         {
             lockHandle.Dispose();
             throw;
         }
+    }
+
+    /// <summary>K3's table, in order.</summary>
+    private static HistoryStateV4 LoadRecoverOrCreate(
+        string full, string worldFingerprint, IEnumerable<SchoolPrestige> leagueIfNew, int startYearIfNew,
+        List<string> report)
+    {
+        var bak = BackupPathFor(full);
+        var primaryExists = File.Exists(full);
+        var bakExists = File.Exists(bak);
+
+        HistoryException? torn = null;
+        if (primaryExists)
+        {
+            try
+            {
+                // A verified career file whose listed file is missing or changed is refused here
+                // (Q6) — never rolled back to the backup.
+                return LoadVerified(full, full, worldFingerprint);
+            }
+            catch (HistoryException hx) when (hx.Error == HistoryError.Torn)
+            {
+                torn = hx;
+            }
+        }
+
+        if (!bakExists)
+        {
+            if (torn is not null)
+                throw new HistoryException(HistoryError.Torn,
+                    torn.Message + " There is no backup to recover from; nothing was written.", torn);
+            return Create(full, worldFingerprint, leagueIfNew, startYearIfNew, report);
+        }
+
+        // The career file is missing or torn and a backup exists: an existing career with a lost
+        // primary. Recovery, never creation.
+        HistoryStateV4 recovered;
+        byte[] bakBytes;
+        try
+        {
+            bakBytes = ReadAll(bak);
+            recovered = LoadVerified(bak, full, worldFingerprint, bakBytes);
+        }
+        catch (HistoryException hx) when (hx.Error != HistoryError.FingerprintMismatch)
+        {
+            throw new HistoryException(HistoryError.BackupUnusable,
+                $"the career file '{full}' is {(primaryExists ? "torn" : "missing")} and its backup cannot stand in " +
+                $"for it — {hx.Message} Nothing was written.", hx);
+        }
+
+        try
+        {
+            if (primaryExists)
+            {
+                var moved = MoveToOrphans(full, full, System.IO.Path.GetFileName(full));
+                report.Add($"The career file was torn; set aside as '{moved}'.");
+                _recoveryStepForTest?.Invoke("primary-set-aside");
+            }
+            var newPath = NewPathFor(full);
+            WriteFlushed(newPath, bakBytes, FileMode.Create);
+            if (!ReadAll(newPath).AsSpan().SequenceEqual(bakBytes))
+                throw new IOException($"the copy of the backup at '{newPath}' does not read back identical.");
+            _recoveryStepForTest?.Invoke("new-written");
+            File.Move(newPath, full, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not recover the career file '{full}' from its backup — {ex.Message} The backup is untouched; " +
+                "the next open tries again.", ex);
+        }
+        report.Add($"Recovered the career from its backup ('{System.IO.Path.GetFileName(bak)}'): it is at its last good save.");
+        return recovered;
+    }
+
+    /// <summary>Read, verify the trailer, parse, check the contract, the world, and every listed
+    /// file's hash. <paramref name="careerPath"/> is the career file the listed paths resolve
+    /// against (the backup's list resolves against the career, not against `.bak`).</summary>
+    private static HistoryStateV4 LoadVerified(string file, string careerPath, string worldFingerprint, byte[]? bytes = null)
+    {
+        bytes ??= ReadAll(file);
+
+        var payload = HistorySchemaV4.SplitTrailer(bytes, out var verified);
+        if (payload is null)
+        {
+            // No trailer. An OLDER career is recognised by its version first (C-60) — it never had
+            // one. Anything else without a trailer is torn.
+            int? version = null;
+            try { version = HistorySchemaV3.PeekVersion(bytes); }
+            catch (HistoryException) { /* not JSON, or no readable version: torn */ }
+            if (version is 1 or 2 or 3)
+                throw new HistoryException(HistoryError.UnsupportedVersion,
+                    $"{GameLogSchemaV1.OlderVersionSentence} (history '{file}' is schemaVersion " +
+                    $"{version.Value.ToString(CultureInfo.InvariantCulture)}; this build reads 4).");
+            if (version is { } v && v != HistoryStateV4.SchemaVersion)
+                throw new HistoryException(HistoryError.UnsupportedVersion,
+                    $"unsupported history schemaVersion {v.ToString(CultureInfo.InvariantCulture)} (this build reads 4).");
+            throw new HistoryException(HistoryError.Torn,
+                $"the career file '{file}' has no fingerprint line at its end — it was not finished being written, " +
+                "or it was edited by hand.");
+        }
+        if (!verified)
+            throw new HistoryException(HistoryError.Torn,
+                $"the career file '{file}' does not match its own fingerprint — it was not finished being written, " +
+                "or it was edited by hand.");
+
+        var state = HistorySchemaV4.Parse(payload);
+
+        if (!string.Equals(state.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
+            throw new HistoryException(HistoryError.FingerprintMismatch,
+                $"this history belongs to a different world. History '{file}' is bound to " +
+                $"{state.WorldFingerprint}, the world given is {worldFingerprint}.");
+
+        foreach (var f in state.Files)
+        {
+            var onDisk = ResolveListed(careerPath, f.Path);
+            if (!File.Exists(onDisk))
+                throw new HistoryException(HistoryError.ListedFileMissing,
+                    $"the career lists '{f.Path}' but '{onDisk}' is not there. The career is refused; nothing was written.");
+            string actual;
+            try { actual = HashFile(onDisk); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new HistoryException(HistoryError.ListedFileMissing,
+                    $"the career lists '{f.Path}' but '{onDisk}' cannot be read — {ex.Message}", ex);
+            }
+            if (!string.Equals(actual, f.Sha256, StringComparison.Ordinal))
+                throw new HistoryException(HistoryError.ListedFileChanged,
+                    $"the career lists '{f.Path}', but '{onDisk}' is not the file it saved (its bytes have changed). " +
+                    "The career is refused; nothing was written.");
+        }
+        return state;
+    }
+
+    /// <summary>CREATION (K2): a stray league-0 set aside; league-0 written; `.new` listing it;
+    /// `.new` moved into place without overwriting.</summary>
+    private static HistoryStateV4 Create(string full, string worldFingerprint, IEnumerable<SchoolPrestige> leagueIfNew,
+                                         int startYearIfNew, List<string> report)
+    {
+        var id = _idSource();
+        var leagueBytes = LeagueStateFile.Encode(id, 0, leagueIfNew);
+        var leaguePath = LeagueStateFile.PathFor(full, 0);
+        try
+        {
+            if (File.Exists(leaguePath))
+            {
+                var folder = System.IO.Path.GetFileName(LeagueStateFile.FolderFor(full));
+                var moved = MoveToOrphans(full, leaguePath, folder + "/" + System.IO.Path.GetFileName(leaguePath));
+                report.Add($"Set aside a league state left by a career that was never created: '{moved}'.");
+            }
+            PublishNewFile(leaguePath, leagueBytes);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not write the new career's league state '{leaguePath}' — {ex.Message}", ex);
+        }
+
+        var state = new HistoryStateV4(id, worldFingerprint, startYearIfNew, 1, 1, 1,
+            new[] { new ListedFile(LeagueStateFile.ListedPathFor(0), HistorySchemaV4.Sha256Hex(leagueBytes)) },
+            Array.Empty<SeasonEntry>());
+        var bytes = HistorySchemaV4.Serialize(state);
+        var newPath = NewPathFor(full);
+        try
+        {
+            WriteFlushed(newPath, bytes, FileMode.Create);
+            File.Move(newPath, full, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not create the career file '{full}' — {ex.Message}", ex);
+        }
+        return state;
     }
 
     // ── Reservation ──────────────────────────────────────────────────────────
@@ -298,7 +493,7 @@ public sealed class HistoryStore : IDisposable
     /// reservation with the counters untouched — never a partial advance.
     ///
     /// <para>★ S124 (K1) — nothing is written here. The numbers are provisional until
-    /// <see cref="PublishReservations"/>; a store disposed before that discards them, and
+    /// <see cref="PublishSeason"/>; a store disposed before that discards them, and
     /// the next open hands the same numbers out again (see the header).</para></summary>
     private long Reserve(int count, Counter which)
     {
@@ -355,16 +550,123 @@ public sealed class HistoryStore : IDisposable
         _reservationsClosed = true;
     }
 
-    /// <summary>★ S124 (K1) — write the counters as they stand, atomically. The v3 season-close
-    /// publication: the LAST write of a season's close, after every season file. Legal after
-    /// <see cref="CloseReservations"/>; requires the lock. An exception means the career file was
-    /// not replaced (the temp-then-rename either happens or does not).</summary>
-    public void PublishReservations()
+    // ── The league state at a close (K5, K6) ─────────────────────────────────
+
+    /// <summary>★ S125 — write season <paramref name="season"/>'s league state under its final name
+    /// (a whole temp file, then one no-overwrite move) and return where it went. Refused by name when
+    /// the career already lists that name (K8). The file is unlisted until <see cref="PublishSeason"/>
+    /// lists it; a close that stops in between leaves it for the next close to set aside.</summary>
+    public string WriteLeagueState(long season, IEnumerable<SchoolPrestige> prestige)
     {
-        if (_lockHandle is null)
+        RequireLock("a league state cannot be written");
+        var listed = LeagueStateFile.ListedPathFor(season);
+        if (_state.Files.Any(f => string.Equals(f.Path, listed, StringComparison.OrdinalIgnoreCase)))
+            throw new HistoryException(HistoryError.ListedNameTaken,
+                $"the career already lists '{listed}'; a listed file is never written again.");
+        var bytes = LeagueStateFile.Encode(_state.HistoryId, season, prestige);
+        var path = LeagueStateFile.PathFor(_path, season);
+        try { PublishNewFile(path, bytes); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
             throw new HistoryException(HistoryError.PersistFailed,
-                "the history lock has already been released; the reservations cannot be published.");
-        PublishAtomically(_path, _state);
+                $"could not write the league state '{path}' — {ex.Message} Nothing was published.", ex);
+        }
+        return path;
+    }
+
+    /// <summary>The latest league state this career lists, read and validated (lineage, season,
+    /// canonical bytes). Every career lists at least `league-0`.</summary>
+    public LeagueState ReadLatestLeagueState()
+    {
+        long latest = -1;
+        foreach (var f in _state.Files)
+            if (HistorySchemaV4.ClassifyListedPath(f.Path) is { Kind: "league" } c && c.N > latest)
+                latest = c.N;
+        if (latest < 0)
+            throw new HistoryException(HistoryError.ManifestMismatch, "the career lists no league state.");
+        return LeagueStateFile.Read(LeagueStateFile.PathFor(_path, latest), _state.HistoryId, latest);
+    }
+
+    // ── A save (K2) ──────────────────────────────────────────────────────────
+
+    /// <summary>★ S125 — THE SAVE. Replaces S124's counters-only publication: the caller has
+    /// already written <paramref name="newFiles"/> under their final names (full paths, each a file a
+    /// career owns, none already listed — K8); the store hashes each, adds them to the list, adds the
+    /// season's rules when the season counter moved, writes `.new`, flushes, and
+    /// `File.Replace(.new, career file, .bak)`.
+    ///
+    /// <para>A publish that moves no season (the suite's hand reservations) passes no rules. A publish
+    /// that moves exactly one season must pass them; more than one season per publish is refused.</para>
+    ///
+    /// <para>An exception means the career file was not replaced and this store still holds the
+    /// previous save. (On Windows, `File.Replace` can fail after renaming the career file to its
+    /// backup: the next open then finds no career file and a whole backup, and recovers to the
+    /// previous save — the save did not happen.)</para></summary>
+    public void PublishSeason(IReadOnlyList<string> newFiles, SeasonRules? rules)
+    {
+        RequireLock("the save cannot be published");
+
+        var files = _state.Files.ToList();
+        foreach (var file in newFiles)
+        {
+            var listed = ListedPathOf(file)
+                ?? throw new HistoryException(HistoryError.ListedPathInvalid,
+                       $"'{file}' is not a file this career can own.");
+            if (files.Any(f => string.Equals(f.Path, listed, StringComparison.OrdinalIgnoreCase)))
+                throw new HistoryException(HistoryError.ListedNameTaken,
+                    $"the career already lists '{listed}'; a listed file is never written again.");
+            string sha;
+            try { sha = HashFile(file); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new HistoryException(HistoryError.PersistFailed,
+                    $"could not read '{file}' to fingerprint it — {ex.Message} Nothing was published.", ex);
+            }
+            files.Add(new ListedFile(listed, sha));
+        }
+        files.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+
+        var seasons = _state.Seasons.ToList();
+        var newSeasons = _state.NextSeasonId - 1 - seasons.Count;
+        if (newSeasons == 1)
+        {
+            if (rules is null)
+                throw new HistoryException(HistoryError.SeasonsInvalid,
+                    "a save that publishes a season must record the rules it was played under.");
+            var effective = _fixedRules is { } fixedRules
+                ? rules with { ConfigSha256 = fixedRules.ConfigSha256, RulesStamp = fixedRules.RulesStamp }
+                : rules;
+            seasons.Add(new SeasonEntry(_state.NextSeasonId - 1, new[] { effective }));
+        }
+        else if (newSeasons == 0)
+        {
+            if (rules is not null)
+                throw new HistoryException(HistoryError.SeasonsInvalid,
+                    "rules were given for a save that publishes no season.");
+        }
+        else
+        {
+            throw new HistoryException(HistoryError.SeasonsInvalid,
+                $"a save publishes at most one season; {newSeasons.ToString(CultureInfo.InvariantCulture)} were held.");
+        }
+
+        var next = _state with { Files = files, Seasons = seasons };
+        HistorySchemaV4.ValidateContract(next);
+        var bytes = HistorySchemaV4.Serialize(next);
+
+        var newPath = NewPathFor(_path);
+        try
+        {
+            WriteFlushed(newPath, bytes, FileMode.Create);
+            _publishStepForTest?.Invoke("new-written");
+            File.Replace(newPath, _path, BackupPathFor(_path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not save the career at '{_path}' — {ex.Message} The previous save stands.", ex);
+        }
+        _state = next;
     }
 
     public void Dispose()
@@ -380,33 +682,68 @@ public sealed class HistoryStore : IDisposable
         h?.Dispose();
     }
 
-    // ── The atomic write ─────────────────────────────────────────────────────
-    //  Complete temp file in the SAME folder (so the move is a rename, not a copy
-    //  across volumes), managed buffers flushed, an OS-level flush to disk
-    //  requested, then moved into place over the old one.
-    //
-    //  Temp-file uniqueness comes from `Guid.NewGuid()`, which is the idiom five
-    //  suite files already use. Deliberately NOT any simulation RNG: an allocator
-    //  that drew from a game stream would change the basketball by saving.
-    private static void PublishAtomically(string path, HistoryStateV3 state)
+    private void RequireLock(string what)
     {
-        var bytes = HistorySchemaV3.Serialize(state);
-        var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) ?? ".";
-        var temp = System.IO.Path.Combine(dir, $".charm-history-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            using (var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-                fs.Write(bytes, 0, bytes.Length);
-                fs.Flush(flushToDisk: true);
-            }
-            File.Move(temp, path, overwrite: true);
-        }
+        if (_lockHandle is null)
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"the history lock has already been released; {what}.");
+    }
+
+    // ── File primitives ──────────────────────────────────────────────────────
+    //  Temp names come from Guid.NewGuid() — deliberately NOT any simulation RNG: an
+    //  allocator that drew from a game stream would change the basketball by saving.
+
+    private static byte[] ReadAll(string path)
+    {
+        try { return File.ReadAllBytes(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* best effort */ }
-            throw new HistoryException(HistoryError.PersistFailed,
-                $"could not make the history durable at '{path}' — no identities were issued. {ex.Message}", ex);
+            throw new HistoryException(HistoryError.PersistFailed, $"could not read '{path}' — {ex.Message}", ex);
         }
+    }
+
+    private static void WriteFlushed(string path, byte[] bytes, FileMode mode)
+    {
+        using var fs = new FileStream(path, mode, FileAccess.Write, FileShare.None);
+        fs.Write(bytes, 0, bytes.Length);
+        fs.Flush(flushToDisk: true);
+    }
+
+    /// <summary>A whole temp file in the same folder, flushed, then moved to its final name without
+    /// overwriting (so an existing file is never replaced).</summary>
+    private static void PublishNewFile(string final, byte[] bytes)
+    {
+        var folder = System.IO.Path.GetDirectoryName(final)!;
+        Directory.CreateDirectory(folder);
+        var temp = System.IO.Path.Combine(folder, $".charm-new-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            WriteFlushed(temp, bytes, FileMode.CreateNew);
+            File.Move(temp, final, overwrite: false);
+        }
+        catch
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* best effort */ }
+            throw;
+        }
+    }
+
+    /// <summary>Move a file into the career's orphans folder, keeping <paramref name="relative"/>; a
+    /// name already taken there gets `.1`, `.2`, … Returns the relative name used. Byte for byte:
+    /// a rename within the career's folder, never a delete.</summary>
+    private static string MoveToOrphans(string careerFull, string source, string relative)
+    {
+        var orphans = SiblingFolderFor(careerFull, "orphans");
+        var target = System.IO.Path.Combine(orphans, relative.Replace('/', System.IO.Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
+        var free = target;
+        var used = relative;
+        for (var k = 1; File.Exists(free) || Directory.Exists(free); k++)
+        {
+            free = target + "." + k.ToString(CultureInfo.InvariantCulture);
+            used = relative + "." + k.ToString(CultureInfo.InvariantCulture);
+        }
+        File.Move(source, free, overwrite: false);
+        return System.IO.Path.GetFileName(orphans) + "/" + used;
     }
 }

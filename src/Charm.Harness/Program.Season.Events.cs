@@ -875,10 +875,14 @@ internal static partial class Program
     //  inference from names and counters):
     //    • a set-aside file is NEVER deleted or changed — moved within the career's folder, so
     //      a rename, byte for byte;
-    //    • only the four recognised kinds are moved: `career.events/season-N.json`, and
-    //      `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`. Lock
-    //      sidecars (reused by design, S90), temp files and anything else stay exactly where
-    //      they are.
+    //    • only the recognised kinds are moved: `career.events/season-N.json`,
+    //      `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`, and
+    //      ★ S125 `career.league/league-N.json` (a close that stopped after writing its league
+    //      state, before the save, leaves one behind; league-0 is never moved, since N ≥ 1).
+    //      Lock sidecars (reused by design, S90), temp files and anything else stay exactly
+    //      where they are.
+    //    • ★ S125 (K8) — none of them is listed: every file of a season at or past the pending
+    //      one belongs to a season the current save (and its backup) has not published.
     //
     //  A file that cannot be moved refuses the close by name. Nothing has been published at
     //  that point, so the career stays at its last finished season.
@@ -897,9 +901,8 @@ internal static partial class Program
     /// <summary>The season a recognised file name belongs to, or null. Canonical only: "season-",
     /// then a positive decimal with no sign and no leading zero, then exactly one recognised
     /// suffix. A name the game would never write is not recognised, and so never moved.</summary>
-    private static long? CareerSeasonOfFileName(string name, IReadOnlyList<string> suffixes)
+    private static long? CareerSeasonOfFileName(string name, IReadOnlyList<string> suffixes, string prefix = "season-")
     {
-        const string prefix = "season-";
         if (!name.StartsWith(prefix, StringComparison.Ordinal)) return null;
         foreach (var suffix in suffixes)
         {
@@ -914,15 +917,16 @@ internal static partial class Program
 
     /// <summary>★ S124 (K4) — move every recognised file of a season ≥ <paramref name="pendingSeasonId"/>
     /// into <c>career.orphans/</c>. Returns what was moved, as paths relative to the career's
-    /// folder with '/' separators, in the order moved (events first, then the log folder, each by
+    /// folder with '/' separators, in the order moved (events first, then the log folder, then ★ S125 the league folder, each by
     /// name). A folder that does not exist, or is not a folder, holds nothing to move.</summary>
     private static List<string> CareerSetAsideUnfinished(string historyPath, long pendingSeasonId)
     {
         var plan = new List<(string Source, string Relative)>();
-        foreach (var (folder, suffixes) in new[]
+        foreach (var (folder, suffixes, prefix) in new[]
                  {
-                     (MteRecordFolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }),
-                     (GameLogWriter.LogFolderFor(historyPath), CareerSeasonFileSuffixesInLogFolder),
+                     (MteRecordFolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }, "season-"),
+                     (GameLogWriter.LogFolderFor(historyPath), CareerSeasonFileSuffixesInLogFolder, "season-"),
+                     (LeagueStateFile.FolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }, "league-"),
                  })
         {
             if (!Directory.Exists(folder)) continue;
@@ -930,7 +934,7 @@ internal static partial class Program
             foreach (var file in Directory.GetFiles(folder).OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
             {
                 var name = Path.GetFileName(file);
-                var season = CareerSeasonOfFileName(name, suffixes);
+                var season = CareerSeasonOfFileName(name, suffixes, prefix);
                 if (season is { } s && s >= pendingSeasonId)
                     plan.Add((file, folderName + "/" + name));
             }

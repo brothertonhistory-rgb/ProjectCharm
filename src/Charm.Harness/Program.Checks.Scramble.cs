@@ -395,7 +395,7 @@ internal static partial class Program
             var stock = LoadWorld(Path.Combine(AppContext.BaseDirectory, "worlds", "stock-d1.world.json"));
             var careerPath = Path.Combine(scratch, "stock", "career.json");
             SeasonRunOutcome career;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(stock)))
+            using (var store = OpenCareer(careerPath, stock))
                 career = RunSeasonCore(stock, ScrambleCheckSeed, configPath, verbose: false, store, retainGameLog: true);
             var n = career.Results.Count;
             if (career.PutbackAudits.Count != n || career.PlayedGames.Count != n || career.PossessionCounts.Count != n)

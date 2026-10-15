@@ -61,7 +61,7 @@ internal static partial class Program
         //  BOUND rather than the resolver guard sitting in front of it.
         {
             var p = Fresh("a11");
-            using var h = HistoryStore.Open(p, tinyFp);
+            using var h = OpenCareer(p, tiny);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, retainGameLog: true);
             var log = ReadBack(p, h, outcome, out var seasonId);
 
@@ -204,7 +204,7 @@ internal static partial class Program
         // ── A5 / A5b — THE STRICT READER, AND WHERE EACH CHECK CAN LIVE ──────
         {
             var p = Fresh("a5");
-            using var h = HistoryStore.Open(p, tinyFp);
+            using var h = OpenCareer(p, tiny);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, retainGameLog: true);
             var seasonId = outcome.Schedule[0].SeasonId!.Value;
             var path = GameLogWriter.FinalPathFor(p, RawSeason(outcome));
@@ -228,7 +228,7 @@ internal static partial class Program
             // Fixture identities come from a SEPARATE, unused career: `h` has already run a
             // season, and S89 closes reservations before the simulation deliberately, so it
             // can no longer issue anything. That is the allocator behaving correctly.
-            using var mint = HistoryStore.Open(Fresh("a5_mint"), tinyFp);
+            using var mint = OpenCareer(Fresh("a5_mint"), tiny);
 
             // ★ A5b — the fingerprint LABEL is a writer-side check and can only be one:
             // the file stores 32 decoded bytes and no label, so a reader physically cannot
@@ -294,17 +294,17 @@ internal static partial class Program
         // ── A10 — WRITER REFUSALS AND THE STATE MACHINE ──────────────────────
         {
             var p = Fresh("a10");
-            using var h = HistoryStore.Open(p, tinyFp);
+            using var h = OpenCareer(p, tiny);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, retainGameLog: true);
             var seasonId = outcome.Schedule[0].SeasonId!.Value;
 
-            using var mint10 = HistoryStore.Open(Fresh("a10_mint"), tinyFp);
+            using var mint10 = OpenCareer(Fresh("a10_mint"), tiny);
             Check("A10 an existing finalized log refuses — no resume, no overwrite",
                   LogErrorOf(() => GameLogWriter.Create(p, h.HistoryId, tinyFp, outcome.Fingerprint,
                       seasonId, MinimalRoster(mint10))) == GameLogError.LogAlreadyExists);
 
             var p2 = Fresh("a10b");
-            using var h2 = HistoryStore.Open(p2, tinyFp);
+            using var h2 = OpenCareer(p2, tiny);
             var sid2 = h2.ReserveSeason();
             Check("A10 an empty roster refuses — a season with nobody in it is not a season",
                   LogErrorOf(() => GameLogWriter.Create(p2, h2.HistoryId, tinyFp, outcome.Fingerprint,
@@ -314,7 +314,7 @@ internal static partial class Program
             // afterwards. Truncating a name in an archive whose whole purpose is being the
             // only record of who somebody was is not an option.
             var p3 = Fresh("a10c");
-            using var h3 = HistoryStore.Open(p3, tinyFp);
+            using var h3 = OpenCareer(p3, tiny);
             var sid3 = h3.ReserveSeason();
             var longName = new string('x', 200);
             var err = LogErrorOf(() => GameLogWriter.Create(p3, h3.HistoryId, tinyFp, outcome.Fingerprint,
@@ -340,17 +340,19 @@ internal static partial class Program
             //   on open; that arm is retired. The refusal must come before any write: the file
             //   is left exactly as it was, and no season log can have been started for it.
             // ★ S119 — a v2 career (saved S90..S118, no start year) is refused the same way.
+            // ★ S125 — and a v3 career (saved S119..S124, no file list, no fingerprint line).
             foreach (var (label, body) in new[]
             {
                 ("v1", RawHistoryV1(tinyFp, 4001, 7, 900)),
                 ("v2", RawHistoryV2(tinyFp, 4001, 7, 900)),
+                ("v3", RawHistoryV3(tinyFp, 4001, 7, 900)),
             })
             {
                 var p = Fresh("a6_" + label);
                 File.WriteAllText(p, body);
                 var before = File.ReadAllBytes(p);
                 HistoryException? refusal = null;
-                try { using var h = HistoryStore.Open(p, tinyFp); }
+                try { using var h = OpenCareer(p, tiny); }
                 catch (HistoryException hx) { refusal = hx; }
                 Check($"A6 a {label} career is refused, classified UnsupportedVersion",
                       refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
@@ -364,16 +366,16 @@ internal static partial class Program
             }
 
             var p2 = Fresh("a6b");
-            using (var h = HistoryStore.Open(p2, tinyFp))
-                Check("A6 a history created fresh is BORN v3 — never written as v1 or v2 at any instant",
-                      File.ReadAllText(p2).Contains("\"schemaVersion\": 3")
+            using (var h = OpenCareer(p2, tiny))
+                Check("A6 a history created fresh is BORN v4 — never written as v1, v2 or v3 at any instant",
+                      File.ReadAllText(p2).Contains("\"schemaVersion\": 4")
                       && HistoryIdIsCanonical(h.HistoryId));
         }
 
         // ── A7 — APPEND-ONLY PREFIX ──────────────────────────────────────────
         {
             var p = Fresh("a7");
-            using var h = HistoryStore.Open(p, tinyFp);
+            using var h = OpenCareer(p, tiny);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, retainGameLog: true);
             var path = GameLogWriter.FinalPathFor(p, RawSeason(outcome));
             var bytes = File.ReadAllBytes(path);
@@ -399,12 +401,12 @@ internal static partial class Program
             //  live in the file, which is the whole point of the file.
             var p = Fresh("a8");
             string id; SeasonRunOutcome one, two;
-            using (var h1 = HistoryStore.Open(p, tinyFp))
+            using (var h1 = OpenCareer(p, tiny))
             {
                 id = h1.HistoryId;
                 one = RunSeasonCore(tiny, seed, configPath, verbose: false, h1, retainGameLog: true);
             }
-            using (var h2 = HistoryStore.Open(p, tinyFp))
+            using (var h2 = OpenCareer(p, tiny))
             {
                 Check("A8 reopening the career keeps its lineage label", h2.HistoryId == id);
                 two = RunSeasonCore(tiny, seed, configPath, verbose: false, h2, retainGameLog: true);
@@ -423,7 +425,7 @@ internal static partial class Program
         // ── A13 — STRING AND NUMERIC CONTRACTS ───────────────────────────────
         {
             var p = Fresh("a13");
-            using var h = HistoryStore.Open(p, tinyFp);
+            using var h = OpenCareer(p, tiny);
             var sid = h.ReserveSeason();
             // Widths are ENCODED-BYTE capacities, not character counts. The multibyte case
             // ends exactly at the boundary, which is where an off-by-one lives.

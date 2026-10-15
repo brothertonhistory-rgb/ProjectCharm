@@ -10,7 +10,19 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 124** (2026-10-12; verified on Emmett's machine — the full suite, **100 timed sections,
+Last updated: **Session 125** (2026-10-14; verified on Emmett's machine — the full suite, **101 timed sections,
+3,220.3s, `ALL CHECKS PASSED.`**; Phase 116 new, 33 assertions; Phase 114 385.6s against 134.7s at S124 — split in the
+sandbox, 288.1s on S125 against 289.3s on S124, so not the code: O-114). **THE CAREER FILE BECOMES TRUSTWORTHY** (save
+design phase **B1b**, C-68): the career file now **lists every file the career owns, each with its fingerprint, and carries
+a fingerprint of its own**; a damaged, missing or hand-edited season file is refused by name when the career opens, before
+anything plays. **A save is one step and keeps the previous save as a backup**; a half-written career file is recovered
+from it automatically, and said so. Each season records the rules it was played under. **A league-state file is born with
+the career** and written at every close — prestige by school, copied from the world, checked equal to it at every open and
+close; nothing plays from it yet. **Careers saved before this build are refused** with the standing sentence. **Nothing
+moved**: every game, log, scouting file and event record byte for byte, the season page line for line. Journal S125 has
+the detail.)
+
+Previous: **Session 124** (2026-10-12; verified on Emmett's machine — the full suite, **100 timed sections,
 2,320.3s, `ALL CHECKS PASSED.`**; Phase 115 new, 19 assertions, 88.0s; Phase 114 32, 134.7s; the suite ~984s slower than S123
 beyond the new phase — O-114, not yet split). **A SEASON LEAVES NO TRACE UNTIL IT
 CLOSES** (save design phase **B1a** — B1 split by Emmett, 2026-10-12, into B1a / B1b / B1c, C-68): a career season now
@@ -629,6 +641,12 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S125 MOVED NO GAME AND NO SEASON FILE — THE CAREER FILE CHANGED BY DESIGN.** Every fingerprint and pin stays where S122
+left it (Phases 102–104 green; Phase 113 C2a/C2b and Phase 116 C1, which pins two fixture-mte seasons against the S124
+build). The career file is v4; its pins are now **portable digests** (the log and scouting hashes masked) under the
+fixed-rules seam: Phase 113 C2c and Phase 114 C4b `29a10651…` (was `2045cb6c…`), Phase 114 C4g `de270510…` (was
+`9c892e97…`). A career folder now also holds `career.json.bak` (from the first save) and `career.league/`.
+
 **S124 MOVED NO GAME AND NO FILE — ONLY WHEN THE FILES ARE WRITTEN.** Every fingerprint and pin stays where S122 left it
 (Phases 102–104, 113 green); the career file after season one is still `9c892e97…`, now written by the close. A career
 folder holds a `career.orphans/` folder only after a close that did not finish.
@@ -828,6 +846,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S125 — THE CAREER FILE BECOMES TRUSTWORTHY (save design B1b, C-68).** `Charm.History`: `HistorySchemaV4` (v4 —
+  `files` by name-free path, `seasons` with their rules, `progress` reserved null, the `sha256:` trailer; the one contract);
+  `LeagueStateFile`; `HistoryStore` — creation as a transaction, `PublishSeason` (`File.Replace` with `.bak`), recovery from
+  a whole backup, every listed hash verified at open, `CareerFiles`, `Seasons`, `OpenReport`, `WriteLeagueState`, the seams
+  `UseFixedRulesForTests` / `UsePublishStepForTests` / `UseRecoveryStepForTests`; thirteen new `HistoryError` codes;
+  `HistorySchemaV3` keeps only the version peek. Harness: `OpenCareer` (every career opener), `AssertLeagueMatchesWorld`,
+  the rules stamp; the close writes `league-N` then saves; the set-aside's fifth kind (`league-N`); pages open a career
+  whose file was lost but backed up. Retired: `PublishReservations`, the v3 serializer and parser, `history_v3_golden.json`.
+  Checks: Phase 116 new (33); `RelistCareerForCheck`, `PortableCareerDigest`; the ledger rows (Phases 80, 81, 87–91, 94,
+  105–107, 110, 112–115); registry 101. Journal S125.
 - **★ S124 — A SEASON LEAVES NO TRACE UNTIL IT CLOSES (save design B1a, C-68).** `HistoryStore`: reservations held in
   memory; `PublishReservations()` (the transitional v3 season-close publication); `CloseReservations()` keeps the lock,
   `Dispose` releases it. `SeasonRun`: the set-up writes nothing; the close checks everything in memory, then writes the
@@ -1471,10 +1499,10 @@ chart is PROVISIONAL pending O-6.
   *"'sim day', 'sim week', 'sim month', 'sim to next game/event'"*; *"close and save the game at any point of the
   season/offseason and … reload the save game where they left off."* **A** — the season that can stop ✅ S123. **B1** —
   safe saves, split by Emmett (2026-10-12) into three: **B1a** — nothing is written until the season closes ✅ S124 (an
-  interrupted season no longer ends a career); **B1b** — the career file becomes trustworthy (v4 with its checksum and
-  file list, the backup and recovery, the rules record, the league-state file, older careers refused): **next**; **B1c**
-  — nothing reads a file the career does not list (the read boundary and quarantine for every reader; retires S124's
-  set-aside rule). **B2** — resuming
+  interrupted season no longer ends a career); **B1b** — the career file becomes trustworthy ✅ S125 (v4 with its
+  checksum and file list, the backup and recovery, the rules record, the league-state file, older careers refused);
+  **B1c** — nothing reads a file the career does not list (the read boundary and quarantine for every reader; retires
+  S124's set-aside rule): **next**. **B2** — resuming
   mid-season: under Q1 a **snapshot** design (its schema, shared references restored, live source state, resources
   rebound), with re-play kept as the suite's oracle — a snapshot restored in a fresh process must finish identical to an
   uninterrupted season; the brief's re-play design of B2 is no longer authoritative. The log **written as games play**
@@ -1486,6 +1514,11 @@ chart is PROVISIONAL pending O-6.
   slightly different results."* Today every game's seeds come from its season seed and fixture ordinal. The live game
   draws fresh; the suite keeps fixed seeds. **In B3 (O-134), ruled Q4 (C-68):** a game already played never changes;
   the days after a save re-roll on every load; the suite keeps fixed dice.
+- **O-137 — VERIFYING A CAREER READS EVERY FILE IT OWNS AT EVERY OPEN (S125).** A stock season's files are about 26 MB
+  (the log ~23, the scouting file ~3), not the ~1.2 MB the B1b prompt assumed; a two-season fixture-mte career verifies in
+  14 ms on Emmett's machine, and Phase 114's stock careers showed no measurable cost (288.1s against 289.3s). It grows
+  linearly with the career. Re-measure when careers run long (every load and every page opens one); options then are verifying the newest season's files only on open, or caching hashes by size and timestamp — a
+  decision, not a fix. Not urgent.
 - **O-136 — A SCOUTING FILE THAT CANNOT BE WRITTEN CRASHES THE `season` COMMAND (S124).** A disk failure writing the
   scouting file escapes as a raw error and a non-zero exit instead of a `SEASON ERROR` line (its error kind is not one the
   command catches; the same holds for a damaged last-season scouting file at step 1). True before S124 too, when it was
@@ -1577,7 +1610,10 @@ chart is PROVISIONAL pending O-6.
   two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite;
   sixth at S123: Phase 90 110.8s against 36.3s at S122, the rest ~7% slower, suite 1,248.5s — split in the sandbox on
   both builds, Phase 90 77.0s on S122 and 68.9s on S123, so not the code; seventh at S124: suite 2,320.3s against
-  1,248.5s, of which the new Phase 115 is 88.0s — not yet split).** Phase 103 ran **93.5s** on Emmett's machine against
+  1,248.5s, of which the new Phase 115 is 88.0s — **closed as not the code** by the S124 sandbox split recorded in the S125
+  prompt, Phase 108 70.6s on S124 against 69.8s on S123, alternated, three runs each; eighth at S125: suite 3,220.3s
+  against 2,320.3s, Phase 114 385.6s against 134.7s — split in the sandbox, Phase 114 alone 289.3s on S124 and 288.1s on
+  S125, alternated, so not the code).** Phase 103 ran **93.5s** on Emmett's machine against
   17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
   of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
   wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
@@ -2821,6 +2857,19 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE CAREER FILE BECOMES TRUSTWORTHY — S125 (2026-10-14). NEXT: B1c, NOTHING READS A FILE THE CAREER DOES NOT LIST
+(O-134, C-68)** — every reader takes its paths from `CareerFiles` (the verified list, already on the store), quarantine at
+load, S124's close-time set-aside retired; drafted at the next-prompt pass (CONVENTIONS §6). **Carry into the draft:**
+(1) **K8 is standing**: a file the current save or its backup lists is never written to, renamed or deleted by the game.
+(2) The hole tolerance in the event-record, rotation, host-debt, contract and memory readers is unreachable in a real v4
+career; the checks that prove it plant a file and **re-seal the career around it** (`RelistCareerForCheck`). B1c decides
+whether those readers keep their hole handling, and if not, which of those checks retire. (3) **A career file's raw bytes
+are not portable** — it lists the log and scouting hashes; pin it only by `PortableCareerDigest`, and keep any
+machine-dependent value out of a pinned field (B2's progress block included). (4) **Every career opener goes through
+`OpenCareer(path, world)`** (about 135 sites in the checks): a new check that calls `HistoryStore.Open` directly makes a
+career with no `league-0` unless it names one. (5) The set-aside now moves five kinds; B1c retires it, so its replacement
+must handle a `league-N` left by a close stopped before its save. (6) O-136 and O-137 sit beside it.
 
 ★ **A SEASON LEAVES NO TRACE UNTIL IT CLOSES — S124 (2026-10-12). NEXT: B1b, THE CAREER FILE BECOMES TRUSTWORTHY
 (O-134, C-68)** — v4 with its checksum and file list, the backup and recovery, the rules record, the league-state file,

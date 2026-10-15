@@ -109,7 +109,8 @@ internal static partial class Program
     private static HistoryStore? OpenHistoryFor(WorldFile world, string? historyPath, int? startYear = null)
     {
         if (historyPath is null) return null;
-        var store = HistoryStore.Open(historyPath, WorldFingerprint(world), startYear ?? SeasonDefaultStartYear);
+        var store = OpenCareer(historyPath, world, startYear ?? SeasonDefaultStartYear);
+        foreach (var line in store.OpenReport) Console.WriteLine("  " + line);
         if (startYear is { } named && named != store.StartYear)
         {
             var started = store.StartYear;
@@ -120,4 +121,80 @@ internal static partial class Program
         }
         return store;
     }
+    // ── ★ S125 (B1b) — every career is opened with its world's league state ───────────────
+    //
+    //  The store cannot see a world (Charm.History references nothing), so a career is born
+    //  with `league-0` only if the harness hands the world's prestige in. Every career opener —
+    //  the `season` command, the five pages and every suite check — goes through OpenCareer,
+    //  so every career has one (S125 check-in, call 3). The suite's store-level checks that
+    //  hand-build careers call HistoryStore.Open directly and say what league they mean.
+
+    /// <summary>Prestige by school, copied from the world, in the shape the league state holds.</summary>
+    private static List<SchoolPrestige> LeaguePrestigeOf(WorldFile world)
+        => world.Schools.Select(s => new SchoolPrestige(s.Id, s.CurrentPrestige)).ToList();
+
+    /// <summary>★ S125 — open (or create) a career bound to <paramref name="world"/>, born with the
+    /// world's league state, and assert that its latest league state equals the world's prestige.
+    /// A refusal disposes the store, so the lock is released.</summary>
+    private static HistoryStore OpenCareer(string historyPath, WorldFile world,
+                                           int startYearIfNew = SeasonDefaultStartYear)
+    {
+        var store = HistoryStore.Open(historyPath, WorldFingerprint(world), LeaguePrestigeOf(world), startYearIfNew);
+        try { AssertLeagueMatchesWorld(store, world, "opened"); }
+        catch { store.Dispose(); throw; }
+        return store;
+    }
+
+    /// <summary>★ S125 (K5) — THE B1 EQUALITY ASSERTION. Until phase C the world is the authority for
+    /// prestige and the league state is its copy; at every open and every close the two must agree
+    /// for every school, or the career is refused by name. Retired in phase C, when the league state
+    /// becomes the authority.</summary>
+    private static void AssertLeagueMatchesWorld(HistoryStore store, WorldFile world, string when)
+    {
+        var league = store.ReadLatestLeagueState();
+        var inLeague = league.Prestige.ToDictionary(p => p.SchoolId, p => p.Value);
+        var inWorld = LeaguePrestigeOf(world).ToDictionary(p => p.SchoolId, p => p.Value);
+        var where = $"league-{league.Season.ToString(CultureInfo.InvariantCulture)}";
+        foreach (var (id, value) in inWorld.OrderBy(kv => kv.Key))
+        {
+            if (!inLeague.TryGetValue(id, out var held))
+                throw new HistoryException(HistoryError.LeagueStateMismatch,
+                    $"the career's league state disagrees with the world as it is {when}: school {id.ToString(CultureInfo.InvariantCulture)} " +
+                    $"is in the world but not in {where}.");
+            if (held != value)
+                throw new HistoryException(HistoryError.LeagueStateMismatch,
+                    $"the career's league state disagrees with the world as it is {when}: school {id.ToString(CultureInfo.InvariantCulture)}'s " +
+                    $"prestige is {held.ToString(CultureInfo.InvariantCulture)} in {where} and " +
+                    $"{value.ToString(CultureInfo.InvariantCulture)} in the world.");
+        }
+        foreach (var id in inLeague.Keys.OrderBy(k => k))
+            if (!inWorld.ContainsKey(id))
+                throw new HistoryException(HistoryError.LeagueStateMismatch,
+                    $"the career's league state disagrees with the world as it is {when}: school {id.ToString(CultureInfo.InvariantCulture)} " +
+                    $"is in {where} but not in the world.");
+    }
+
+    // ── ★ S125 (K4) — the rules a season was played under ───────────────────────────────
+
+    private static string? _rulesStamp;
+
+    /// <summary>★ S125 (K4) — the build stamp: SHA-256 over the on-disk bytes of the three local
+    /// assemblies, Charm.Engine, Charm.History and Charm.Harness, in that order. A build-identity
+    /// check, not a compatibility proof: any rebuild that changes a byte changes it, and an equal
+    /// stamp says nothing about worlds or settings. Debug and Release stamp differently.</summary>
+    private static string RulesStamp()
+    {
+        if (_rulesStamp is not null) return _rulesStamp;
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var asm in new[] { typeof(Charm.Engine.GovernorConfig).Assembly, typeof(HistoryStore).Assembly, typeof(Program).Assembly })
+            hash.AppendData(File.ReadAllBytes(asm.Location));
+        return _rulesStamp = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
+
+    /// <summary>★ S125 (K4) — one season's rules entry: its first legal day, the settings file as
+    /// read, the build stamp.</summary>
+    private static SeasonRules CareerRulesFor(DateOnly firstLegalDay, string engineConfigPath)
+        => new(firstLegalDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+               Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(engineConfigPath))).ToLowerInvariant(),
+               RulesStamp());
 }

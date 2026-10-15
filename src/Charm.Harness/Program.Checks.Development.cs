@@ -69,18 +69,18 @@ internal static partial class Program
             var seedTwo = SeasonTwoSeed(DevelopmentCheckSeed);
             SeasonRunOutcome Career(WorldFile w, long seed, string path)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
             }
             GameLogV1 ReadLog(WorldFile w, string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(path, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
             IReadOnlyList<ScoutingRecord> ReadScout(WorldFile w, string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return ScoutingFile.Read(path, new ScoutingBindings(store.HistoryId, store.WorldFingerprint, season));
             }
             static string Digest(SeasonRunOutcome run) => RatingSha(string.Concat(run.Results.Select((x, i) =>
@@ -709,7 +709,8 @@ internal static partial class Program
             var scoutPath = ScoutingFile.PathFor(negPath, 3);
             var zeroed = readScout(mte, negPath, 3).Select(r => r with { Streaks = new int[r.Streaks.Count] }).ToList();
             File.Delete(scoutPath);
-            using (var store = HistoryStore.Open(negPath, WorldFingerprint(mte)))
+            RelistCareerForCheck(negPath);   // ★ S125 — the zeroed file below stands in as if saved that way
+            using (var store = OpenCareer(negPath, mte))
                 ScoutingFile.Write(negPath, store.HistoryId, store.WorldFingerprint, s3.Schedule[0].SeasonId!.Value, zeroed);
             var n4 = career(mte, seeds[3], negPath);
             var changed = Enumerable.Range(0, s4.Development.ReturnerCount)
@@ -722,6 +723,7 @@ internal static partial class Program
         {
             var missPath = Path.Combine(missDir, "career.json");
             File.Delete(ScoutingFile.PathFor(missPath, 2));
+            RelistCareerForCheck(missPath);   // ★ S125 — a file the save never kept, so the READER is what refuses
             var before = PeekState(missPath);
             Exception? refused = null;
             try { career(mte, seeds[2], missPath); } catch (Exception ex) { refused = ex; }
@@ -735,7 +737,7 @@ internal static partial class Program
 
             var good = ScoutingFile.PathFor(path, 2);
             var bytes = File.ReadAllBytes(good);
-            using var store = HistoryStore.Open(path, WorldFingerprint(mte));
+            using var store = OpenCareer(path, mte);
             var bind = new ScoutingBindings(store.HistoryId, store.WorldFingerprint, 2);
             ScoutingError? Refusal(Action a)
             {

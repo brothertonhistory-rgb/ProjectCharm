@@ -61,10 +61,14 @@ internal static partial class Program
     private const string CalendarGoldenSeasonOneEvents =
         "85b6acf3a35f9be567f3d98c358fb46f66439031f0896d87379a3bb0c03338a0";
 
-    /// <summary>★ CAPTURED FROM THE S121 BUILD: the career file after two seasons, raw bytes —
-    /// the next person, season and game numbers, which every game of both seasons spent.</summary>
+    /// <summary>★ CAPTURED FROM THE S125 BUILD (re-pinned from the S121 build's v3 bytes, 2045cb6c…,
+    /// when the career file became v4): the career file after two seasons, as its PORTABLE digest
+    /// (<see cref="PortableCareerDigest"/>) — the next person, season and game numbers every game of both
+    /// seasons spent, every file the two seasons wrote listed (the integer-only ones by hash), and both
+    /// seasons' rules under the fixed-rules seam. Every season file it lists is still the S121 build's
+    /// (C2a, C2b).</summary>
     private const string CalendarGoldenCareerFile =
-        "2045cb6cabd67649fd8ba4b1654c19d59975c1b3d7f6b60d2320e9f33a8309b1";
+        "29a106515979788c4bf17d2e6c32012a4e40ecca72578e20e718554dac8e7309";
 
     /// <summary>Every game block of a log — the facts and every man's stat line — as text, hashed.
     /// Integers, dates and flags only, so the same games hash the same on any machine.</summary>
@@ -194,9 +198,12 @@ internal static partial class Program
                 var path = Path.Combine(scratch, folder, "career.json");
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 using var fixedId = HistoryStore.UseFixedHistoryIdForTests(CalendarFixedHistoryId);
+                // ★ S125 — the career file now records each season's rules, whose build stamp changes with
+                //   every build; a career file pinned across sessions pins fixed rules instead.
+                using var fixedRules = HistoryStore.UseFixedRulesForTests(CheckFixedConfigSha, CheckFixedRulesStamp);
                 SeasonRunOutcome Season(long seed)
                 {
-                    using var store = HistoryStore.Open(path, WorldFingerprint(stock));
+                    using var store = OpenCareer(path, stock);
                     return RunSeasonCore(stock, seed, configPath, verbose: false, store, retainGameLog: true,
                                          playOrderForTest: order);
                 }
@@ -206,7 +213,7 @@ internal static partial class Program
             }
             GameLogV1 ReadLog(string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(stock));
+                using var store = OpenCareer(path, stock);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(path, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
@@ -256,9 +263,11 @@ internal static partial class Program
                 var eventsSha = File.Exists(eventsOne) ? Sha(File.ReadAllBytes(eventsOne)) : "ABSENT";
                 Check("C2b: season one's event record, byte for byte, is the S121 build's — every bracket finish and " +
                       "showcase result where it was", eventsSha == CalendarGoldenSeasonOneEvents, eventsSha[..Math.Min(16, eventsSha.Length)]);
-                var careerSha = Sha(File.ReadAllBytes(cal.Path));
-                Check("C2c: the career file after two seasons, byte for byte, is the S121 build's — the same person, season " +
-                      "and game numbers spent", careerSha == CalendarGoldenCareerFile, careerSha[..16]);
+                var careerSha = PortableCareerDigest(File.ReadAllBytes(cal.Path));
+                Check("C2c: the career file after two seasons is the S125 capture — the same person, season and game numbers " +
+                      "spent, every file listed, the integer-only ones by hash (★ S125: v4, re-pinned from the S121 build's v3; " +
+                      "the portable digest, since the log and scouting files hold machine-dependent decimals)",
+                      careerSha == CalendarGoldenCareerFile, careerSha);
 
                 var diff = CalendarFilesDiffer(Path.GetDirectoryName(cal.Path)!, Path.GetDirectoryName(old.Path)!);
                 Check("C2d: ★ ON THIS MACHINE — the same two-season career played on the calendar and in the old order " +
@@ -552,9 +561,10 @@ internal static partial class Program
                     var damaged = (byte[])original.Clone();
                     damaged[damaged.Length / 2] ^= 0x01;
                     File.WriteAllBytes(logPath, damaged);
+                    RelistCareerForCheck(cal.Path);   // ★ S125 — saved that way, so the READER is what refuses it
                     unreadable = Day("2026-11-18");
                 }
-                finally { File.WriteAllBytes(logPath, original); }
+                finally { File.WriteAllBytes(logPath, original); RelistCareerForCheck(cal.Path); }
                 Check("C5m: REFUSED BY NAME — a season with no record (its log made unreadable, restored after)",
                       unreadable.Code == 1 && unreadable.Text.Contains("season 1 has no record", StringComparison.Ordinal),
                       unreadable.Text.Trim());
@@ -617,7 +627,7 @@ internal static partial class Program
         SeasonRunOutcome Career(WorldFile w, long seed, string path)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var store = HistoryStore.Open(path, WorldFingerprint(w));
+            using var store = OpenCareer(path, w);
             return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
         }
     }

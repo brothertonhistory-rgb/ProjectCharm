@@ -29,7 +29,7 @@ namespace Charm.Harness;
 //        with a negative control.
 //    C3  a number is never published twice — game numbers once each across the career;
 //        a man kept across seasons is the same man; the reference's numbers exactly.
-//    C4  the set-aside — the four recognised kinds of this season or later, moved
+//    C4  the set-aside — the recognised kinds (★ S125: five) of this season or later, moved
 //        byte-untouched; earlier seasons and unrecognised files never touched; a blocked
 //        orphans folder refuses the close by name with nothing published.
 //    C5  the close's order, observed step by step, with a negative control.
@@ -52,6 +52,7 @@ internal static partial class Program
                      "career.gamelog/season-" + n + ".log",
                      "career.gamelog/season-" + n + ".log.inprogress",
                      "career.gamelog/season-" + n + ".scout",
+                     "career.league/league-" + n + ".json",          // ★ S125
                  })
         {
             var path = Path.Combine(careerDir, rel.Replace('/', Path.DirectorySeparatorChar));
@@ -71,13 +72,15 @@ internal static partial class Program
         string Prog() => "career.gamelog/season-" + n + ".log.inprogress";
         string Scout() => "career.gamelog/season-" + n + ".scout";
         string Rec() => "career.events/season-" + n + ".json";
+        string League() => "career.league/league-" + n + ".json";
         string[]? expected = step switch
         {
             "set-aside" or "log" => Array.Empty<string>(),
             "log-open" => new[] { Prog() },
             "scouting" => new[] { Log() },
             "record" => new[] { Log(), Scout() },
-            "counters" => new[] { Rec(), Log(), Scout() },
+            "league" => new[] { Rec(), Log(), Scout() },                // ★ S125
+            "counters" => new[] { Rec(), Log(), Scout(), League() },
             _ => null,
         };
         if (expected is null) return $"{step}: not a close step this comparison knows";
@@ -107,7 +110,8 @@ internal static partial class Program
         var dir = Path.GetDirectoryName(careerPath)!;
         var files = SeasonCloseSeasonFiles(dir, season);
         var n = season.ToString(CultureInfo.InvariantCulture);
-        foreach (var rel in new[] { "career.events/season-" + n + ".json", "career.gamelog/season-" + n + ".log", "career.gamelog/season-" + n + ".scout" })
+        foreach (var rel in new[] { "career.events/season-" + n + ".json", "career.gamelog/season-" + n + ".log",
+                                    "career.gamelog/season-" + n + ".scout", "career.league/league-" + n + ".json" })
             if (!files.ContainsKey(rel)) return "missing " + rel;
         return null;
     }
@@ -182,7 +186,7 @@ internal static partial class Program
                 => new(History: store, RetainGameLog: true, CloseStepForTest: step);
             void PlayInProcess(string name, long seed, Action<string>? step = null)
             {
-                using var store = HistoryStore.Open(CareerOf(name), fp);
+                using var store = OpenCareer(CareerOf(name), mte);
                 using var run = SeasonBegin(mte, seed, configPath, verbose: false, Opts(store, step));
                 run.AdvanceThrough(run.LastLegalDay);
                 run.Finish();
@@ -191,7 +195,7 @@ internal static partial class Program
             //  throw from the close's test seam at the named step. Returns the interruption's own message.
             string? Interrupt(string name, long seed, string? atStep)
             {
-                using var store = HistoryStore.Open(CareerOf(name), fp);
+                using var store = OpenCareer(CareerOf(name), mte);
                 using var run = SeasonBegin(mte, seed, configPath, verbose: false, Opts(store,
                     atStep is null ? null : s => { if (s == atStep) throw new InvalidOperationException("CONSTRUCTED INTERRUPTION at " + s); }));
                 if (atStep is null)
@@ -232,7 +236,7 @@ internal static partial class Program
             //  The reference: one career, season one, then season two with the close OBSERVED (C5).
             // ════════════════════════════════════════════════════════════════════
             Directory.CreateDirectory(Dir("fresh"));
-            using (HistoryStore.Open(CareerOf("fresh"), fp)) { }       // a new career, as Open creates it
+            using (OpenCareer(CareerOf("fresh"), mte)) { }       // a new career, as Open creates it
             CopyDir(Dir("fresh"), Dir("master"));
             PlayInProcess("master", seedOne);
             var masterCareer = File.ReadAllBytes(CareerOf("master"));
@@ -255,7 +259,7 @@ internal static partial class Program
                 var watched = 0;
                 bool heldDuringPlay = true;
                 SortedDictionary<string, string> before, afterBegin, afterDispose;
-                var store = HistoryStore.Open(CareerOf("mid"), fp);
+                var store = OpenCareer(CareerOf("mid"), mte);
                 try
                 {
                     before = SeasonFolderSnapshot(Dir("mid"));
@@ -299,7 +303,9 @@ internal static partial class Program
                 ("at-log-open", "log-open", new[] { "career.gamelog/season-2.log.inprogress" }),
                 ("at-scouting", "scouting", new[] { "career.gamelog/season-2.log" }),
                 ("at-record", "record", new[] { "career.gamelog/season-2.log", "career.gamelog/season-2.scout" }),
-                ("at-counters", "counters", new[] { "career.events/season-2.json", "career.gamelog/season-2.log", "career.gamelog/season-2.scout" }),
+                ("at-league", "league", new[] { "career.events/season-2.json", "career.gamelog/season-2.log", "career.gamelog/season-2.scout" }),   // ★ S125
+                ("at-counters", "counters", new[] { "career.events/season-2.json", "career.gamelog/season-2.log", "career.gamelog/season-2.scout",
+                                                    "career.league/league-2.json" }),
             };
             var rerunCareers = new List<(string Name, long Seasons)>();
             foreach (var (name, step, setAside) in cases)
@@ -357,7 +363,8 @@ internal static partial class Program
             foreach (var (name, step, setAside) in new (string, string?, string[])[]
                      {
                          ("first-mid", null, Array.Empty<string>()),
-                         ("first-counters", "counters", new[] { "career.events/season-1.json", "career.gamelog/season-1.log", "career.gamelog/season-1.scout" }),
+                         ("first-counters", "counters", new[] { "career.events/season-1.json", "career.gamelog/season-1.log", "career.gamelog/season-1.scout",
+                                                                 "career.league/league-1.json" }),
                      })
             {
                 CopyDir(Dir("fresh"), Dir(name));
@@ -389,7 +396,7 @@ internal static partial class Program
                     var games = new List<GameId>();
                     var rosters = new Dictionary<PersonId, string>[seasons];
                     string historyId;
-                    using (var s = HistoryStore.Open(CareerOf(name), fp)) historyId = s.HistoryId;
+                    using (var s = OpenCareer(CareerOf(name), mte)) historyId = s.HistoryId;
                     for (var n = 1L; n <= seasons; n++)
                     {
                         var log = GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(CareerOf(name), n),
@@ -419,7 +426,7 @@ internal static partial class Program
                 Check("C3: ★ in every re-run career, and in the reference over three seasons: every game number appears once in the " +
                       "career, a man kept from one season to the next is the same man, and the game numbers and each season's people " +
                       "are the reference's exactly",
-                      faults.Count == 0 && refGamesOnce && rerunCareers.Count == 9,
+                      faults.Count == 0 && refGamesOnce && rerunCareers.Count == 10,
                       faults.Count > 0 ? string.Join("; ", faults.Take(3))
                                        : Inv115($"{rerunCareers.Count} careers; the reference: {refIds.Games.Count} game numbers over three seasons"));
             }
@@ -435,8 +442,9 @@ internal static partial class Program
                     ["career.events/season-2.json"] = "{ \"planted\": \"record\" }"u8.ToArray(),
                     ["career.gamelog/season-2.log.inprogress"] = "planted unfinished log"u8.ToArray(),
                     ["career.gamelog/season-4.scout"] = "planted scouting file, two seasons past"u8.ToArray(),
+                    ["career.league/league-3.json"] = "planted league state, a season past"u8.ToArray(),   // ★ S125 — the fifth kind
                 };
-                var notes = new[] { "career.events/notes.txt", "career.gamelog/notes.txt" };
+                var notes = new[] { "career.events/notes.txt", "career.gamelog/notes.txt", "career.league/notes.txt" };
                 foreach (var (rel, bytes) in planted) File.WriteAllBytes(P(rel), bytes);
                 foreach (var rel in notes) File.WriteAllText(P(rel), "an unrecognised file");
                 var notesBefore = notes.ToDictionary(r => r, r => File.ReadAllBytes(P(r)));
@@ -447,7 +455,8 @@ internal static partial class Program
                               && planted.All(kv => orphans[kv.Key] == Convert.ToHexString(SHA256.HashData(kv.Value)).ToLowerInvariant());
                 var published = PeekState(CareerOf("plant")) == afterTwo;
                 var sameAsRef = SeasonSnapshotDiff(refSnap, Outside("plant", notes));
-                Check("C4a: ★ a planted record and unfinished log for the pending season, and a scouting file two seasons past it, " +
+                Check("C4a: ★ a planted record and unfinished log for the pending season, a scouting file two seasons past it, and " +
+                      "★ S125 a league state a season past it " +
                       "are SET ASIDE into career.orphans — each one's SHA-256 the same after the move — and the season publishes, " +
                       "identical to the uninterrupted career",
                       msg is null && movedOk && published && sameAsRef is null,
@@ -486,7 +495,7 @@ internal static partial class Program
             CopyDir(Dir("master"), Dir("one-store"));
             {
                 string? second;
-                using (var store = HistoryStore.Open(CareerOf("one-store"), fp))
+                using (var store = OpenCareer(CareerOf("one-store"), mte))
                 {
                     using (var run = SeasonBegin(mte, seedTwo, configPath, verbose: false,
                                Opts(store, s => { if (s == "counters") throw new InvalidOperationException("CONSTRUCTED INTERRUPTION at " + s); })))
@@ -505,13 +514,14 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 var steps = observed.Select(o => o.Step).ToList();
-                var expectedSteps = new[] { "set-aside", "log", "log-open", "scouting", "record", "counters", "published" };
+                var expectedSteps = new[] { "set-aside", "log", "log-open", "scouting", "record", "league", "counters", "published" };
                 var faults = observed.Where(o => o.Step != "published")
                                      .Select(o => SeasonCloseOrderFault(o.Step, o.Files, o.Career, masterCareer, 2))
                                      .Where(f => f is not null).ToList();
                 var afterClose = File.ReadAllBytes(CareerOf("ref"));
                 Check("C5a: ★ at each close step the season files on disk are exactly the earlier steps' — none at set-aside and log; " +
-                      "the unfinished log at log-open; the log at scouting; the log and scouting file at record; all three at counters — " +
+                      "the unfinished log at log-open; the log at scouting; the log and scouting file at record; all three at league; " +
+                      "★ S125 those and the league state at counters — " +
                       "and the career file is the pre-season bytes at every step; after the close it is not",
                       steps.SequenceEqual(expectedSteps) && faults.Count == 0 && !afterClose.AsSpan().SequenceEqual(masterCareer),
                       faults.Count > 0 ? faults[0]! : "[" + string.Join(" → ", steps) + "]");

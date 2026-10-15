@@ -452,7 +452,7 @@ internal static partial class Program
             var clashHistory = Path.Combine(scratch, "clash.json");
             string? clashMsg;
             long peekedBefore, peekedAfter;
-            using (var store = HistoryStore.Open(clashHistory, WorldFingerprint(clashWorld)))
+            using (var store = OpenCareer(clashHistory, clashWorld))
             {
                 peekedBefore = store.PeekNextSeasonId;
                 clashMsg = Refusal(() =>
@@ -475,9 +475,9 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             var careerPath = Path.Combine(scratch, "career.json");
             EventSeasonOutcome s1, s2;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(careerPath, mte))
                 s1 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(careerPath, mte))
                 s2 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
 
             Check("C6a: a career-bound season writes its record, empty pool or not",
@@ -502,7 +502,8 @@ internal static partial class Program
             MteHistory ReadHistoryOf(string mutated)
             {
                 File.WriteAllText(recPath, mutated);
-                using var store = HistoryStore.Open(careerPath, WorldFingerprint(mte));
+                RelistCareerForCheck(careerPath);   // ★ S125 — saved that way, so the READER is what judges it
+                using var store = OpenCareer(careerPath, mte);
                 return MteReadHistory(store, 2);
             }
             long ReadCount(string mutated) => ReadHistoryOf(mutated).SeatedInEvent.Count;
@@ -530,7 +531,8 @@ internal static partial class Program
 
             File.WriteAllText(recPath, good);
             File.Delete(recPath);
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
+            RelistCareerForCheck(careerPath);   // ★ S125 — a year the save never kept, so the READER finds the hole
+            using (var store = OpenCareer(careerPath, mte))
             {
                 var h = MteReadHistory(store, 3);
                 Check("C6i: a deleted year is a silent hole and its neighbour still reads",
@@ -551,13 +553,13 @@ internal static partial class Program
             string? failMsg;
             long spentBefore, spentAfter;
             byte[] failCareerBefore;
-            using (var store = HistoryStore.Open(failPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(failPath, mte))
             {
                 spentBefore = store.PeekNextSeasonId;
                 failCareerBefore = File.ReadAllBytes(failPath);
                 failMsg = Refusal(() => RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
             }
-            using (var store = HistoryStore.Open(failPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(failPath, mte))
                 spentAfter = store.PeekNextSeasonId;
             Check("C7a: ★ S124 — a record that cannot be written FAILS THE CLOSE BY NAME; reopened, the career " +
                   "has not moved (its file byte-identical) and no season file was published",
@@ -622,7 +624,7 @@ internal static partial class Program
             long cBefore, cAfter;
             byte[] plantedBefore;
             string planted, setAsideAt;
-            using (var store = HistoryStore.Open(collidePath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(collidePath, mte))
             {
                 cBefore = store.PeekNextSeasonId;
                 Directory.CreateDirectory(MteRecordFolderFor(collidePath));
@@ -632,7 +634,7 @@ internal static partial class Program
                 collideMsg = Refusal(() =>
                     RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
             }
-            using (var store = HistoryStore.Open(collidePath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(collidePath, mte))
                 cAfter = store.PeekNextSeasonId;
             setAsideAt = Path.Combine(CareerOrphansFolderFor(collidePath), Path.GetFileName(MteRecordFolderFor(collidePath)),
                                       Path.GetFileName(planted));

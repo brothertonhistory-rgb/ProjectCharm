@@ -243,10 +243,10 @@ internal static partial class Program
             var stock = LoadWorld(Path.Combine(AppContext.BaseDirectory, "worlds", "stock-d1.world.json"));
             var careerPath = Path.Combine(scratch, "stock", "career.json");
             SeasonRunOutcome career;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(stock)))
+            using (var store = OpenCareer(careerPath, stock))
                 career = RunSeasonCore(stock, PutbackCheckSeed, configPath, verbose: false, store, retainGameLog: true);
             GameLogV1 log;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(stock)))
+            using (var store = OpenCareer(careerPath, stock))
                 log = GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(careerPath, 1),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, 1));
             var n = career.Results.Count;

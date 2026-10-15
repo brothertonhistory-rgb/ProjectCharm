@@ -50,12 +50,13 @@ internal static partial class Program
 {
     private const int SeasonRunChunkSeed = 123123;
 
-    // ── ★ CAPTURED FROM THE S122 BUILD (the S123 gate's read-only probe: the stock career's
-    //    season one under the fixed history id). ──
-    /// <summary>The career file after season one's numbers: on the S122 build the set-up published
-    /// it before the first tip; ★ S124 — the close publishes it, as its last write, byte for byte.</summary>
+    // ── ★ CAPTURED FROM THE S125 BUILD (re-pinned from the S122 build's v3 bytes, 9c892e97…, when the
+    //    career file became v4): the stock career's season one under the fixed history id and fixed rules. ──
+    /// <summary>The career file after season one's close, as its portable digest (<see cref="PortableCareerDigest"/>):
+    /// its numbers, every file season one wrote listed (the integer-only ones by hash), and its rules. Every season
+    /// file it lists is still the S121 build's (C4a).</summary>
     private const string SeasonRunSeasonOneCareer =
-        "9c892e97ad37e26959b150ec2648f2cf607907e4b855333e1cbbbdb6837ef4ec";
+        "de2705107f1a6d8a270518cb4325f8b63e8796d326d7aa7022bbf6cc56783276";
 
     // ══════════════════════════════════════════════════════════════════════════════
     //  ★ THE STATE INVENTORY (K6). Every instance field of the season run, the walk and the
@@ -139,6 +140,8 @@ internal static partial class Program
         new("SeasonRun", "calendar", "SeasonCalendarRun", SeasonStateCategory.Mutable, "the walk; its fields are inventoried below"),
         new("SeasonRun", "resultSlots", "List<SeasonGameResult>", SeasonStateCategory.SharedReference, "the SAME list every ConfTourneySource reads"),
         new("SeasonRun", "closeStepForTest", "Action<string>", SeasonStateCategory.ResourceOrCallback, "★ S124 — the close's test seam; null in production"),
+        new("SeasonRun", "world", "WorldFile", SeasonStateCategory.SharedReference, "★ S125 — the world the season was set up from; the close compares and copies its prestige"),
+        new("SeasonRun", "engineConfigPath", "string", SeasonStateCategory.ImmutableSetup, "★ S125 — the settings file the season's rules entry hashes"),
         new("SeasonRun", "finished", "bool", SeasonStateCategory.Mutable, "lifecycle; a save is only taken of an open run"),
         new("SeasonRun", "disposed", "bool", SeasonStateCategory.Mutable, "lifecycle"),
         new("SeasonRun", "faultedOn", "string", SeasonStateCategory.Mutable, "lifecycle"),
@@ -411,6 +414,8 @@ internal static partial class Program
             var mte = LoadWorld(WorldPath("fixture-mte.world.json"));
             var seedTwo = SeasonTwoSeed(CalendarCheckSeed);
             using var fixedId = HistoryStore.UseFixedHistoryIdForTests(CalendarFixedHistoryId);
+            // ★ S125 — the career files pinned here record each season's rules under the fixed-rules seam.
+            using var fixedRules = HistoryStore.UseFixedRulesForTests(CheckFixedConfigSha, CheckFixedRulesStamp);
 
             int Advance(SeasonRun run, SeasonChunkMode mode, Action<SeasonRun>? afterChunk)
             {
@@ -450,7 +455,7 @@ internal static partial class Program
                 Action? beforeBegin = null)
             {
                 var sw = Stopwatch.StartNew();
-                var store = career is null ? null : HistoryStore.Open(career, WorldFingerprint(w));
+                var store = career is null ? null : OpenCareer(career, w);
                 beforeBegin?.Invoke();
                 var old = Console.Out;
                 var text = new StringWriter(CultureInfo.InvariantCulture);
@@ -478,7 +483,7 @@ internal static partial class Program
             string Folder(string folder) => Path.Combine(scratch, folder);
             GameLogV1 ReadLog(string career, long season)
             {
-                using var store = HistoryStore.Open(career, WorldFingerprint(stock));
+                using var store = OpenCareer(career, stock);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(career, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
@@ -502,6 +507,7 @@ internal static partial class Program
             var advancesWatched = 0;
             string? copyControl = null;
             SortedDictionary<string, string>? s1FinishSnap = null;
+            byte[]? s1FinishCareer = null;   // ★ S125 — the career file's bytes at the close, for its portable digest
             var s1LockFreeAfterFinish = false;
             foreach (var mode in modes)
             {
@@ -540,6 +546,7 @@ internal static partial class Program
                     finish = () =>
                     {
                         s1FinishSnap = SeasonFolderSnapshot(Folder(folder));
+                        s1FinishCareer = File.ReadAllBytes(Career(folder));
                         s1LockFreeAfterFinish = !SeasonLockHeld(logLock);
                         s1CareerLockHeldAfterFinish = SeasonLockHeld(careerLock);
                     };
@@ -617,7 +624,7 @@ internal static partial class Program
             // ── C1f — NEGATIVE CONTROL: one lost piece of live state is seen. ──
             {
                 Directory.CreateDirectory(Folder("mte-control"));
-                using var store = HistoryStore.Open(Career("mte-control"), WorldFingerprint(mte));
+                using var store = OpenCareer(Career("mte-control"), mte);
                 SeasonRunOutcome dropped;
                 int heldBefore;
                 using (var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
@@ -641,7 +648,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 Directory.CreateDirectory(Folder("mte-contract"));
-                var store = HistoryStore.Open(Career("mte-contract"), WorldFingerprint(mte));
+                var store = OpenCareer(Career("mte-contract"), mte);
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
                 var startsFirst = run.NextDay == run.FirstLegalDay && !run.IsComplete && run.GamesPlayed == 0;
@@ -686,7 +693,7 @@ internal static partial class Program
                 //  A run set up and never advanced, disposed: ★ S124 — the career folder is exactly what it was
                 //  before the season began (the career file byte-identical, no other file).
                 Directory.CreateDirectory(Folder("mte-abandoned"));
-                using var store = HistoryStore.Open(Career("mte-abandoned"), WorldFingerprint(mte));
+                using var store = OpenCareer(Career("mte-abandoned"), mte);
                 var before = SeasonFolderSnapshot(Folder("mte-abandoned"));
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
@@ -695,9 +702,9 @@ internal static partial class Program
                 var after = SeasonFolderSnapshot(Folder("mte-abandoned"));
                 var refused = Refusal(() => run.AdvanceThrough(run.LastLegalDay));
                 Check("C2i: ★ S124 — a run never advanced, disposed: Dispose succeeds, the career folder is exactly what it was " +
-                      "before the season (the career file byte-identical and its lock, no other file), and every call after is refused by name",
+                      "before the season (the career file byte-identical, its lock and ★ S125 its league-0, no other file), and every call after is refused by name",
                       disposeFault is null && SeasonSnapshotDiff(before, after) is null
-                      && after.Keys.SequenceEqual(new[] { "career.json", "career.json.lock" })
+                      && after.Keys.SequenceEqual(new[] { "career.json", "career.json.lock", "career.league/league-0.json" })
                       && Says(refused, "disposed"),
                       disposeFault?.Message ?? SeasonSnapshotDiff(before, after) ?? Inv($"[{string.Join(", ", after.Keys)}]; {Short(refused)}"));
             }
@@ -748,7 +755,7 @@ internal static partial class Program
                 //  The same fault at the season-run level: the walk's play callback replaced by reflection
                 //  (test-only; no production code reads anything for it), throwing on a chosen game day.
                 Directory.CreateDirectory(Folder("mte-fault"));
-                var store = HistoryStore.Open(Career("mte-fault"), WorldFingerprint(mte));
+                var store = OpenCareer(Career("mte-fault"), mte);
                 var run = SeasonBegin(mte, CalendarCheckSeed, configPath, verbose: false,
                     new SeasonRunOptions(History: store, RetainGameLog: true));
                 run.AdvanceThrough(run.FirstLegalDay.AddDays(9));
@@ -815,8 +822,8 @@ internal static partial class Program
                       "from the S121 build), and its event record byte for byte",
                       digestOne == CalendarGoldenSeasonOneBlocks && events == CalendarGoldenSeasonOneEvents,
                       Inv($"blocks {digestOne[..16]}, events {events[..16]}"));
-                var careerSha = Sha(File.ReadAllBytes(Career("s1-Random")));
-                Check("C4b: ★ after season two, also in random chunks: the career file byte for byte is the S121 build's",
+                var careerSha = PortableCareerDigest(File.ReadAllBytes(Career("s1-Random")));
+                Check("C4b: ★ after season two, also in random chunks: the career file is the S125 capture (Phase 113's portable digest)",
                       careerSha == CalendarGoldenCareerFile, careerSha[..16]);
                 Check("C4c: ★ the legacy stock season played day by day is the S120 capture",
                       GamesDigest(legacyDay.Outcome) == RatingGoldenPreS112GameDigest, GamesDigest(legacyDay.Outcome)[..16]);
@@ -824,8 +831,8 @@ internal static partial class Program
                 //  The stage boundaries. ★ S124 (B1a) — a season writes nothing until it closes.
                 var beforeDiff = beforeSeason is null || afterBegin is null ? "NO SNAPSHOT" : SeasonSnapshotDiff(beforeSeason, afterBegin);
                 Check("C4d: ★ S124 — after the set-up: the career folder is exactly what it was before the season (the career " +
-                      "file byte-identical and its lock sidecar, nothing else), and the career lock is held",
-                      beforeDiff is null && afterBegin!.Keys.SequenceEqual(new[] { "career.json", "career.json.lock" }) && lockHeldAtBegin,
+                      "file byte-identical, its lock sidecar and ★ S125 the league-0 it was born with, nothing else), and the career lock is held",
+                      beforeDiff is null && afterBegin!.Keys.SequenceEqual(new[] { "career.json", "career.json.lock", "career.league/league-0.json" }) && lockHeldAtBegin,
                       beforeDiff ?? Inv($"[{string.Join(", ", afterBegin!.Keys)}]"));
                 //  (C4e, the unfinished log's prefix relation, is retired at S124: there is no unfinished log.)
                 Check("C4f: ★ after every advance (random chunks): still exactly the folder from before the season, and the " +
@@ -834,13 +841,15 @@ internal static partial class Program
                       advanceFaults.Count > 0 ? string.Join("; ", advanceFaults.Take(3)) : Inv($"{advancesWatched} advances watched"));
                 //  After the close (read before the store is disposed): the one-call season's folder as season one left it.
                 var finishFault = s1FinishSnap is null ? "NO SNAPSHOT" : SeasonSnapshotDiff(s1OneCallSnap, s1FinishSnap);
-                var careerWritten = s1FinishSnap?.GetValueOrDefault("career.json") == SeasonRunSeasonOneCareer;
+                var careerSeen = s1FinishCareer is null ? "ABSENT" : PortableCareerDigest(s1FinishCareer);
+                var careerWritten = careerSeen == SeasonRunSeasonOneCareer;
                 Check("C4g: ★ after the close: the file list and every file the one-call season's byte for byte; the career file " +
-                      "is the S122 capture, now written by the close; the season log's lock released by the close and the career " +
+                      "is the S125 capture (★ v4: every file season one wrote listed by hash, and its backup beside it); the season log's lock released by the close and the career " +
                       "lock still held (it is the store's, released when the store is disposed)",
                       finishFault is null && careerWritten && s1LockFreeAfterFinish && s1CareerLockHeldAfterFinish
-                      && s1FinishSnap!.ContainsKey("career.gamelog/season-1.log") && !s1FinishSnap.ContainsKey("career.gamelog/season-1.log.inprogress"),
-                      finishFault ?? Inv($"{s1FinishSnap!.Count} files"));
+                      && s1FinishSnap!.ContainsKey("career.gamelog/season-1.log") && !s1FinishSnap.ContainsKey("career.gamelog/season-1.log.inprogress")
+                      && s1FinishSnap.ContainsKey("career.json.bak") && s1FinishSnap.ContainsKey("career.league/league-1.json"),
+                      finishFault ?? (careerWritten ? Inv($"{s1FinishSnap!.Count} files") : "career file " + careerSeen));
 
                 //  NEGATIVE CONTROL, on a copy of the folder taken mid-season (the live folder is never written).
                 var copyCareer = Path.Combine(copyControl ?? scratch, "career.json");

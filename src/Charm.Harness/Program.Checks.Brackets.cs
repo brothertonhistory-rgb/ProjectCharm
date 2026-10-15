@@ -412,16 +412,16 @@ internal static partial class Program
             var ledgerPath = Path.Combine(scratch, "ledger.json");
             SeasonRunOutcome ledger;
             long spentBefore, spentAfter;
-            using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
+            using (var store = OpenCareer(ledgerPath, allOn))
             {
                 spentBefore = RawGameNumber(store.ReserveGames(1)[0]);
                 // ★ S124 — the probe is published (a store of its own, so nothing else moves);
                 //   unpublished, the season below would reissue it and the subtraction would be one short.
-                store.PublishReservations();
+                store.PublishSeason(Array.Empty<string>(), null);   // ★ S125 — a save that publishes no season
             }
-            using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
+            using (var store = OpenCareer(ledgerPath, allOn))
                 ledger = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
-            using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
+            using (var store = OpenCareer(ledgerPath, allOn))
                 spentAfter = RawGameNumber(store.ReserveGames(1)[0]);
 
             //  ★ S110 — a THREE-term sum. The two-term form was a statement about a two-way
@@ -448,7 +448,7 @@ internal static partial class Program
             SeasonRunOutcome career;
             long careerSeason;
             string careerHistoryId, careerWorldFp;
-            using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(careerPath, mte))
             {
                 careerHistoryId = store.HistoryId;
                 careerWorldFp = store.WorldFingerprint;
@@ -575,7 +575,7 @@ internal static partial class Program
                 //  A fresh career's record, turned back to NotPlayed IN MEMORY, to attack — so the
                 //  remaining refusals are not answered by the Completed guard firing first.
                 var freshPath = Path.Combine(scratch, "fresh.json");
-                using (var store = HistoryStore.Open(freshPath, WorldFingerprint(mte)))
+                using (var store = OpenCareer(freshPath, mte))
                 {
                     var freshSeason = store.PeekNextSeasonId;
                     var freshHistoryId = store.HistoryId;
@@ -645,7 +645,7 @@ internal static partial class Program
                 var leakPath = Path.Combine(scratch, "leak.json");
                 var fp = WorldFingerprint(allOn);
                 long leakSeason;
-                using (var store = HistoryStore.Open(leakPath, fp))
+                using (var store = OpenCareer(leakPath, allOn))
                 {
                     var sid = store.ReserveSeason();
                     leakSeason = store.PeekNextSeasonId - 1;
@@ -663,9 +663,10 @@ internal static partial class Program
                     w.Dispose();
                     // ★ S124 — numbers are held until published; the reopen below must find this
                     //   hand-built season played, so it is published as a season's close would.
-                    store.PublishReservations();
+                    //   ★ S125 — the hand-written log listed, and a stand-in rules entry for the hand-spent season.
+                    store.PublishSeason(new[] { GameLogWriter.FinalPathFor(leakPath, leakSeason) }, HandSeasonRules);
                 }
-                using (var store = HistoryStore.Open(leakPath, fp))
+                using (var store = OpenCareer(leakPath, allOn))
                 {
                     var mem = ReadHostMemory(store);
                     var has = mem.PreviousResidualHost.TryGetValue((1, 2), out var host);
@@ -771,7 +772,7 @@ internal static partial class Program
                 SeasonRunOutcome twin;
                 long twinSeason;
                 string twinId, twinFp;
-                using (var store = HistoryStore.Open(twinPath, WorldFingerprint(mte)))
+                using (var store = OpenCareer(twinPath, mte))
                 {
                     twinId = store.HistoryId; twinFp = store.WorldFingerprint;
                     twinSeason = store.PeekNextSeasonId;

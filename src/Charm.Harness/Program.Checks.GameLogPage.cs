@@ -92,12 +92,12 @@ internal static partial class Program
 
             SeasonRunOutcome Career(WorldFile w, long seed, string path)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
             }
             GameLogV1 ReadLog(WorldFile w, string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(path, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
@@ -142,7 +142,7 @@ internal static partial class Program
                 Exception? WriteWith(IReadOnlyList<PeriodScoreV1>? periods, string tag) => Refusal(() =>
                 {
                     var p = Path.Combine(scratch, "w-" + tag, "career.json");
-                    using var h = HistoryStore.Open(p, mteFp);
+                    using var h = OpenCareer(p, mte);
                     var sid = h.ReserveSeason();
                     var who = h.ReservePersons(1);
                     var ros = new List<RosterEntryV2> { new(who[0], 1, 0, 1, "P", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 0, 0.0, "") };
@@ -180,7 +180,7 @@ internal static partial class Program
                 var forgedPath = Path.Combine(scratch, "stock", "forged.log");
                 File.WriteAllBytes(forgedPath, bytes);
                 Exception? forged;
-                using (var store = HistoryStore.Open(stockPath, WorldFingerprint(stock)))
+                using (var store = OpenCareer(stockPath, stock))
                     forged = Refusal(() => GameLogReader.ReadFinalized(forgedPath, new GameLogBindings(store.HistoryId, store.WorldFingerprint, 1)));
                 Check("C1g: NEGATIVE CONTROL — a re-sealed log whose first half is one point off its final is refused by the READER on its value",
                       forged is GameLogException { Error: GameLogError.DomainViolation } && forged.Message.Contains("periods sum to", StringComparison.Ordinal),
@@ -195,6 +195,7 @@ internal static partial class Program
                 var current = File.ReadAllBytes(oldLog);
                 var s116 = DowngradeToBlockSchema2(current);
                 File.WriteAllBytes(oldLog, s116);
+                RelistCareerForCheck(oldPath);   // ★ S125 — saved that way, so the READER is what refuses it
                 var blockTwo = Refusal(() => ReadLog(mte, oldPath, 1));
                 Check("C2a: ★ a log in the S116 layout (block schema 2, no score by period — built here from a real log) is refused " +
                       "by the reader, whole, with the standing sentence",
@@ -217,11 +218,13 @@ internal static partial class Program
                 BitConverter.GetBytes(188).CopyTo(rowOne, 104);
                 BitConverter.GetBytes(25).CopyTo(rowOne, 108);
                 File.WriteAllBytes(oldLog, rowOne);
+                RelistCareerForCheck(oldPath);
                 var rowRefused = Refusal(() => ReadLog(mte, oldPath, 1));
                 Check("C2c: a log declaring row schema 1 is refused by the same sentence",
                       rowRefused is GameLogException { Error: GameLogError.UnsupportedLogVersion }
                       && rowRefused.Message.StartsWith(Older, StringComparison.Ordinal), Blame(rowRefused));
                 File.WriteAllBytes(oldLog, current);
+                RelistCareerForCheck(oldPath);
                 var restored = Refusal(() => ReadLog(mte, oldPath, 1));
                 Check("C2d: the same file put back reads clean (the refusals above are the version, not the file)", restored is null, Blame(restored));
             }
@@ -316,14 +319,18 @@ internal static partial class Program
             var in3 = r3.Select(e => e.PersonId).ToHashSet();
             var spanner = r1.First(e => e.Class <= 1 && in3.Contains(e.PersonId)
                                         && mteLogs.All(l => l.Blocks.Any(b => b.Rows.Any(r => r.PersonId == e.PersonId)))).PersonId;
+            //  ★ S125 — each re-seals the career around whatever state the check planted (saved that way), so the
+            //    READER is what judges a damaged season — see RelistCareerForCheck.
             PlayerCareer Live(PersonId who)
             {
-                using var h = HistoryStore.Open(mtePath, mteFp);
+                RelistCareerForCheck(mtePath);
+                using var h = OpenCareer(mtePath, mte);
                 return ReadPlayerCareer(h, mte, who);
             }
             SeasonGameLog LiveLog(PersonId who, long season)
             {
-                using var h = HistoryStore.Open(mtePath, mteFp);
+                RelistCareerForCheck(mtePath);
+                using var h = OpenCareer(mtePath, mte);
                 return ReadSeasonGameLog(ReadCareerLogs(h), mte, Is(who), "x", season);
             }
 

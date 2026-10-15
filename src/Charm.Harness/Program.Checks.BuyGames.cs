@@ -565,7 +565,7 @@ internal static partial class Program
                 long season;
                 string historyId, worldFp;
                 SeasonRunOutcome career;
-                using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
+                using (var store = OpenCareer(careerPath, mte))
                 {
                     historyId = store.HistoryId;
                     worldFp = store.WorldFingerprint;
@@ -669,7 +669,7 @@ internal static partial class Program
                 // Ids — the career world.
                 var mteCareer = Path.Combine(scratch, "ids.json");
                 SeasonRunOutcome idRun;
-                using (var store = HistoryStore.Open(mteCareer, WorldFingerprint(mte)))
+                using (var store = OpenCareer(mteCareer, mte))
                     idRun = RunSeasonCore(mte, BuyCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
                 var idBuys = idRun.PlayedGames.Where(p => p.IsBuyGame).ToList();
                 var clashed = idRun.PlayedGames.Select(p => p == idBuys[3]

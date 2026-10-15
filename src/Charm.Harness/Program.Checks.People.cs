@@ -85,12 +85,12 @@ internal static partial class Program
             // Play one season on a career through the production path (retained log, as the command does).
             SeasonRunOutcome Career(WorldFile w, long seed, string path)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
             }
             GameLogV1 ReadLog(WorldFile w, string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(path, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
@@ -99,7 +99,7 @@ internal static partial class Program
             {
                 var rtPath = Path.Combine(scratch, "rt", "career.json");
                 DivvyResult divvy;
-                using (var store = HistoryStore.Open(rtPath, WorldFingerprint(stock)))
+                using (var store = OpenCareer(rtPath, stock))
                     divvy = RunDivvyDraft(stock, PeopleCheckSeed, store);
                 var rows = BuildSeasonRows(divvy, stock, verbose: false);
                 var entries = BuildRetentionRoster(rows, divvy);
@@ -243,7 +243,7 @@ internal static partial class Program
 
                 // C4: the turnover on the log-read season one is the turnover on the in-memory one.
                 CareerPeople fromLog;
-                using (var store = HistoryStore.Open(pathA, WorldFingerprint(mte)))
+                using (var store = OpenCareer(pathA, mte))
                     fromLog = ReadCareerPeople(store, mte, 1);
                 string Name(int k) => $"Pool_s2_{k}";
                 var tMem = RunTurnover(mte, a1.Divvy, seedTwo, Name);
@@ -283,11 +283,11 @@ internal static partial class Program
                 // ── C6: refusals, each by name ──────────────────────────────────
                 // (i) previous season kept no log: season one on the test flag (no log), season two normally.
                 var noLog = Path.Combine(scratch, "nolog", "career.json");
-                using (var store = HistoryStore.Open(noLog, WorldFingerprint(mte)))
+                using (var store = OpenCareer(noLog, mte))
                     RunSeasonCore(mte, PeopleCheckSeed, configPath, verbose: false, store, retainGameLog: false, bootstrapPeopleForTest: true);
                 var spentBefore = PeekState(noLog);
                 Exception? exNoLog;
-                using (var store = HistoryStore.Open(noLog, WorldFingerprint(mte)))
+                using (var store = OpenCareer(noLog, mte))
                     exNoLog = Refusal(() => RunSeasonCore(mte, seedTwo, configPath, verbose: false, store, retainGameLog: true));
                 var spentAfter = PeekState(noLog);
                 Check("C6a: previous season kept no log -> refused by name, and nothing was spent",
@@ -296,7 +296,7 @@ internal static partial class Program
                       Blame(exNoLog));
                 // (ii) a career season that keeps no log is refused unless a check says so.
                 Exception? exNoRetain;
-                using (var store = HistoryStore.Open(Path.Combine(scratch, "noretain", "career.json"), WorldFingerprint(mte)))
+                using (var store = OpenCareer(Path.Combine(scratch, "noretain", "career.json"), mte))
                     exNoRetain = Refusal(() => RunSeasonCore(mte, PeopleCheckSeed, configPath, verbose: false, store, retainGameLog: false));
                 Check("C6b: history mode without the retained log is refused by name (the log is the career's people)",
                       RefusedWith(exNoRetain, "requires the retained log"), Blame(exNoRetain));
@@ -308,12 +308,13 @@ internal static partial class Program
                 Career(mte, PeopleCheckSeed, v1Path);
                 var v1Log = GameLogWriter.FinalPathFor(v1Path, 1);
                 File.WriteAllBytes(v1Log, DowngradeRosterToV1(File.ReadAllBytes(v1Log)));
+                RelistCareerForCheck(v1Path);   // ★ S125 — saved that way, so the READER is what refuses it
                 var readV1 = Refusal(() => ReadLog(mte, v1Path, 1));
                 Check("C6c-pre: ★ S117 — a roster-schema-1 log is refused by the READER, by the standing sentence (C-60)",
                       readV1 is GameLogException { Error: GameLogError.UnsupportedLogVersion }
                       && RefusedWith(readV1, "saved by an older version of the game — start a new career"), Blame(readV1));
                 Exception? exV1;
-                using (var store = HistoryStore.Open(v1Path, WorldFingerprint(mte)))
+                using (var store = OpenCareer(v1Path, mte))
                     exV1 = Refusal(() => RunSeasonCore(mte, seedTwo, configPath, verbose: false, store, retainGameLog: true));
                 Check("C6c: previous log is roster schema 1 (pre-S115, no class) -> the next season is refused by the same sentence",
                       RefusedWith(exV1, "saved by an older version of the game — start a new career"), Blame(exV1));
@@ -347,7 +348,7 @@ internal static partial class Program
                 Check("C6l: a class byte outside 0..3 is refused by the FORMAT itself",
                       RefusedWith(Refusal(() =>
                       {
-                          using var store = HistoryStore.Open(Path.Combine(scratch, "cls", "career.json"), WorldFingerprint(mte));
+                          using var store = OpenCareer(Path.Combine(scratch, "cls", "career.json"), mte);
                           var sid = store.ReserveSeason();
                           var bad = new List<RosterEntryV2> { new(store.ReservePersons(1)[0], 1, 0, 1, "X", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 4, 0.0, "") };
                           GameLogWriter.Create(Path.Combine(scratch, "cls", "career.json"), store.HistoryId, store.WorldFingerprint, new string('a', 64), sid, bad);

@@ -102,7 +102,7 @@ internal static partial class Program
             var firstPath = Path.Combine(scratch, "first.charm");
             List<SeasonGame> first;
             SeasonMemoryOutcome firstMemory;
-            using (var store = HistoryStore.Open(firstPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(firstPath, mte))
                 first = BuildSeasonSchedule(mte, MteCheckSeed, store, deferNumbering: true,
                                             out firstMemory, out _);
             Check("C1b: season one of a career — no log can exist, so there is no debt and the schedule is " +
@@ -116,7 +116,7 @@ internal static partial class Program
             PlaySeasonWithoutRetention(mte, MteCheckSeed, unloggedPath, configPath);
             List<SeasonGame> afterUnlogged;
             SeasonMemoryOutcome unloggedMemory;
-            using (var store = HistoryStore.Open(unloggedPath, WorldFingerprint(mte)))
+            using (var store = OpenCareer(unloggedPath, mte))
                 afterUnlogged = BuildSeasonSchedule(mte, MteCheckSeed, store, deferNumbering: true,
                                                     out unloggedMemory, out _);
             Check("C1c: a career whose only season published no log has no readable year anywhere in the " +
@@ -141,8 +141,9 @@ internal static partial class Program
             var wounded = GameLogWriter.FinalPathFor(damagedPath, 3);
             var bytes = File.ReadAllBytes(wounded);
             File.WriteAllBytes(wounded, bytes[..(bytes.Length / 2)]);
+            RelistCareerForCheck(damagedPath);   // ★ S125 — saved that way, so the READER is what refuses it
             HostDebtHistory closedDebt; HostMemory closedHosts; RotationHistory survivingRotation;
-            using (var store = HistoryStore.Open(damagedPath, WorldFingerprint(rot)))
+            using (var store = OpenCareer(damagedPath, rot))
             {
                 var career = ReadCareerMemory(store, RotationWindowSeasons);
                 closedDebt = career.Debt; closedHosts = career.Hosts; survivingRotation = career.Rotation;
@@ -173,7 +174,7 @@ internal static partial class Program
             var disc2 = PlayRetainedSeason(memWorld, HostDebtCheckSeed, discPath, configPath);
             List<SeasonGame> disc3Debt, disc3OneHop;
             SeasonRotationOutcome disc3Rotation;
-            using (var store = HistoryStore.Open(discPath, WorldFingerprint(memWorld)))
+            using (var store = OpenCareer(discPath, memWorld))
             {
                 disc3Debt = BuildSeasonSchedule(memWorld, HostDebtCheckSeed, store, deferNumbering: true,
                                                 out _, out disc3Rotation);
@@ -334,7 +335,7 @@ internal static partial class Program
             //  would disagree exactly there.
             {
                 HostDebtHistory fromDisk;
-                using (var store = HistoryStore.Open(careerPath, WorldFingerprint(rot)))
+                using (var store = OpenCareer(careerPath, rot))
                     fromDisk = ReadCareerMemory(store, RotationWindowSeasons).Debt;
 
                 var fromPlayed = WindowedDebt(
@@ -503,7 +504,7 @@ internal static partial class Program
     private static SeasonRunOutcome PlayRetainedSeasonAtDebtWindow(
         WorldFile world, long seed, string historyPath, string configPath, int debtWindow)
     {
-        using var store = HistoryStore.Open(historyPath, WorldFingerprint(world));
+        using var store = OpenCareer(historyPath, world);
         return RunSeasonCore(world, seed, configPath, verbose: false, store, retainGameLog: true,
                              debtWindowOverride: debtWindow);
     }

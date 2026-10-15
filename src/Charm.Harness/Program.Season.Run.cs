@@ -29,10 +29,12 @@ namespace Charm.Harness;
 //    Finish         — every write, in this order, each only for a career season and under
 //                     the same condition as before: (1) set aside any file of this season
 //                     or later left by a close that did not finish, (2) the log, (3) the
-//                     scouting file, (4) the event record, written once, (5) the career
-//                     file's counters — LAST. The outcome is built before (1), so once (5)
-//                     has replaced the career file nothing after it can fail: the season is
-//                     committed. A season stopped anywhere before (5) leaves the career file
+//                     scouting file, (4) the event record, written once, (5) ★ S125 the
+//                     season's league state, (6) THE SAVE — the career file listing every
+//                     file above by hash, swapped in with the previous save kept as its
+//                     backup — LAST. The outcome is built before (1), so once (6) has
+//                     replaced the career file nothing after it can fail: the season is
+//                     committed. A season stopped anywhere before (6) leaves the career file
 //                     byte-identical and is played again, identically, next run.
 //
 //  ★ THE INVENTORY (K6). Every instance field of this class, of SeasonCalendarRun and
@@ -139,6 +141,8 @@ internal static partial class Program
         // ── Resources and callbacks (recreate or rebind; never data) ────────────────
         //  ★ S124 — the season log's writer is no longer a field: it is a local of the close.
         private readonly Action<string>? closeStepForTest;                 // ★ S124 (K6) — null on every production path
+        private readonly WorldFile world;                                   // ★ S125 — the close compares and copies its prestige (K5)
+        private readonly string engineConfigPath;                           // ★ S125 — the settings file the season's rules entry hashes (K4)
 
         // ── The run's lifecycle (K9) ────────────────────────────────────────────────
         private bool finished;
@@ -150,6 +154,8 @@ internal static partial class Program
             //  The options, under the parameter names the set-up has always read.
             history = options.History;
             this.verbose = verbose;
+            this.world = world;
+            this.engineConfigPath = engineConfigPath;
             closeStepForTest = options.CloseStepForTest;
             var retainGameLog = options.RetainGameLog;
             var roadShaveOverride = options.RoadShaveOverride;
@@ -825,18 +831,22 @@ internal static partial class Program
             };
 
             if (history is not null)
-                WriteCareerSeason(history, recordBytes!);
+                WriteCareerSeason(history, recordBytes!, calendarPlay.FirstLegalDay);
             return outcome;
         }
 
-        /// <summary>★ S124 (K3) — every write a career season makes, in this order: the set-aside, the
-        /// log, the scouting file, the event record, the career file's counters. THE COMMIT BOUNDARY:
-        /// the publish is the last step that can fail. An exception from it means the career file was
-        /// not replaced (temp, then one rename); anything before it leaves the career file exactly as
-        /// it was, and the season is played again next run, its stray files set aside first.</summary>
-        private void WriteCareerSeason(HistoryStore store, byte[] recordBytes)
+        /// <summary>★ S124 (K3), ★ S125 (K6) — every write a career season makes, in this order: the
+        /// set-aside, the log, the scouting file, the event record, the league state, the SAVE. Before
+        /// any of it, the league state on disk is checked against the world (K5). THE COMMIT BOUNDARY:
+        /// the save is the last step that can fail; an exception from it means the career file was not
+        /// replaced, and anything before it leaves the career file exactly as it was — the season is
+        /// played again next run, its stray files set aside first.</summary>
+        private void WriteCareerSeason(HistoryStore store, byte[] recordBytes, DateOnly firstLegalDay)
         {
             void Step(string name) => closeStepForTest?.Invoke(name);
+
+            //  ★ S125 (K5) — the B1 equality assertion at the close, before a single write.
+            AssertLeagueMatchesWorld(store, world, "closed");
 
             Step("set-aside");
             var setAside = CareerSetAsideUnfinished(store.Path, pendingSeasonId);
@@ -844,6 +854,7 @@ internal static partial class Program
                 Console.WriteLine("  Set aside from a season that did not finish closing (career.orphans): " +
                                   string.Join(", ", setAside));
 
+            var written = new List<string>();
             if (keepsLog)
             {
                 Step("log");
@@ -868,21 +879,29 @@ internal static partial class Program
                 {
                     gameLog.Dispose();
                 }
+                written.Add(GameLogWriter.FinalPathFor(store.Path, pendingSeasonId));
             }
 
             // ★ S121 — this season's people's hidden state, written whole once, beside the log.
             if (devStates is not null)
             {
                 Step("scouting");
-                ScoutingFile.Write(store.Path, store.HistoryId, store.WorldFingerprint,
-                                   schedule[0].SeasonId!.Value, DevScoutingRecords(divvy, devStates));
+                written.Add(ScoutingFile.Write(store.Path, store.HistoryId, store.WorldFingerprint,
+                                               schedule[0].SeasonId!.Value, DevScoutingRecords(divvy, devStates)));
             }
 
             Step("record");
             MteWriteRecord(store.Path, pendingSeasonId, recordBytes);
+            written.Add(MteRecordPathFor(store.Path, pendingSeasonId));
 
+            //  ★ S125 (K5) — the season's league state: prestige by school, copied from the world.
+            Step("league");
+            written.Add(store.WriteLeagueState(pendingSeasonId, LeaguePrestigeOf(world)));
+
+            //  ★ S125 (K2) — THE SAVE: every file above listed by hash, the season's rules recorded,
+            //  `.new` written, then one swap with the previous save kept as the backup.
             Step("counters");
-            store.PublishReservations();
+            store.PublishSeason(written, CareerRulesFor(firstLegalDay, engineConfigPath));
             Step("published");
         }
 

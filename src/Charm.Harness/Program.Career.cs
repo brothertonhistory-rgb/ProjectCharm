@@ -487,15 +487,21 @@ internal static partial class Program
     }
 
     /// <summary>Open a career for READING. A path with no career file is refused by name rather
-    /// than handed to `HistoryStore.Open`, which would create one.</summary>
+    /// than handed to `HistoryStore.Open`, which would create one. ★ S125 — a career whose file is
+    /// lost but whose backup is there is an existing career: it is opened (and recovered), not refused.</summary>
     private static HistoryStore? OpenCareerForReading(string command, WorldFile world, string historyPath)
     {
-        if (!File.Exists(historyPath))
+        if (!File.Exists(historyPath) && !File.Exists(Path.GetFullPath(historyPath) + ".bak"))
         {
             Console.WriteLine($"{command} ERROR: there is no career at '{historyPath}'. A page reads a career; it never starts one.");
             return null;
         }
-        try { return HistoryStore.Open(historyPath, WorldFingerprint(world)); }
+        try
+        {
+            var store = OpenCareer(historyPath, world);
+            foreach (var line in store.OpenReport) Console.WriteLine("  " + line);
+            return store;
+        }
         catch (HistoryException hx)
         {
             Console.WriteLine($"{command} ERROR [{hx.Error}]: {hx.Message}");

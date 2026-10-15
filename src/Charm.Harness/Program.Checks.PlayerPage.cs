@@ -89,12 +89,12 @@ internal static partial class Program
 
             SeasonRunOutcome Career(WorldFile w, long seed, string path)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
             }
             GameLogV1 ReadLog(WorldFile w, string path, long season)
             {
-                using var store = HistoryStore.Open(path, WorldFingerprint(w));
+                using var store = OpenCareer(path, w);
                 return GameLogReader.ReadFinalized(GameLogWriter.FinalPathFor(path, season),
                     new GameLogBindings(store.HistoryId, store.WorldFingerprint, season));
             }
@@ -112,7 +112,7 @@ internal static partial class Program
             {
                 var p = Path.Combine(scratch, "c1", "career.json");
                 var sched = new string('d', 64);
-                using var h = HistoryStore.Open(p, mteFp);
+                using var h = OpenCareer(p, mte);
                 var sid = h.ReserveSeason();
                 var people = h.ReservePersons(2);
                 var roster = people.Select((who, i) => new RosterEntryV2(who, 1, i, i + 1, $"C1_{i}", "", RosterPosition.Guard,
@@ -227,7 +227,7 @@ internal static partial class Program
                 var both = Refusal(() =>
                 {
                     var p2 = Path.Combine(scratch, "both", "career.json");
-                    using var h2 = HistoryStore.Open(p2, mteFp);
+                    using var h2 = OpenCareer(p2, mte);
                     var sid2 = h2.ReserveSeason();
                     var who2 = h2.ReservePersons(1);
                     var ros = new List<RosterEntryV2> { new(who2[0], 1, 0, 1, "B", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 0, 0.0, "") };
@@ -267,7 +267,7 @@ internal static partial class Program
                 var noDate = Refusal(() =>
                 {
                     var p3 = Path.Combine(scratch, "nodate", "career.json");
-                    using var h3 = HistoryStore.Open(p3, mteFp);
+                    using var h3 = OpenCareer(p3, mte);
                     var sid3 = h3.ReserveSeason();
                     var who3 = h3.ReservePersons(1);
                     var ros = new List<RosterEntryV2> { new(who3[0], 1, 0, 1, "D", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 0, 0.0, "") };
@@ -434,7 +434,8 @@ internal static partial class Program
                 File.WriteAllBytes(s2Path, flipped);
                 PlayerCareer Live(PersonId who)
                 {
-                    using var h = HistoryStore.Open(mtePath, mteFp);
+                    RelistCareerForCheck(mtePath);   // ★ S125 — each planted state saved that way; the READER judges it
+                    using var h = OpenCareer(mtePath, mte);
                     return ReadPlayerCareer(h, mte, who);
                 }
                 var unreadable = Live(spanner.PersonId);

@@ -1,0 +1,19 @@
+{
+  "format": "charm-history",
+  "schemaVersion": 4,
+  "historyId": "0123456789abcdef0123456789abcdef",
+  "worldFingerprint": "sha256-v1:0000000000000000000000000000000000000000000000000000000000000000",
+  "startYear": 2026,
+  "nextPersonId": 1,
+  "nextSeasonId": 1,
+  "nextGameId": 1,
+  "files": [
+    {
+      "path": "league/league-0.json",
+      "sha256": "754f89323140e435ac7cbe26eab54d57ecca99d10a2246605d536c853e6abc5b"
+    }
+  ],
+  "seasons": [],
+  "progress": null
+}
+sha256:f45b5641faa3000675dd81fca1613701189f768ba0810db6ecea930c5c2b1803

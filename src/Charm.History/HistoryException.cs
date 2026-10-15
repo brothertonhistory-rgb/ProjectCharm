@@ -55,6 +55,41 @@ public enum HistoryError
     /// <summary>★ S119 — a year was named for an existing career that started in a different
     /// one. A career's first year is fixed at creation and never moves.</summary>
     StartYearMismatch,
+
+    // ── ★ S125 (B1b) — the career file v4: its fingerprint, its list, its backup. ──
+
+    /// <summary>The career file's trailer is missing or does not match its bytes — half-written,
+    /// or edited by hand. Recovered from the backup when the backup is whole.</summary>
+    Torn,
+    /// <summary>A file the career lists is not on disk.</summary>
+    ListedFileMissing,
+    /// <summary>A file the career lists is on disk, but its bytes are not the ones listed.</summary>
+    ListedFileChanged,
+    /// <summary>The career file is missing or torn and its backup cannot stand in for it (missing,
+    /// torn, damaged, or one of the files it lists is missing or changed).</summary>
+    BackupUnusable,
+    /// <summary>A listed path is not a file a career owns: absolute, `..`, `\`, out of order, or
+    /// outside the five kinds (which also refuses the career file, its backup, its lock and orphans).</summary>
+    ListedPathInvalid,
+    /// <summary>A path is listed twice.</summary>
+    ListedPathDuplicate,
+    /// <summary>A listed hash is not 64 lowercase hex characters.</summary>
+    ListedHashInvalid,
+    /// <summary>The season list is out of order, has a gap or a repeat, disagrees with the season
+    /// counter, or carries a malformed rules entry.</summary>
+    SeasonsInvalid,
+    /// <summary>The list and the seasons disagree: a season file for an unpublished season, or no
+    /// `league-0`.</summary>
+    ManifestMismatch,
+    /// <summary>`progress` is not null — this build saves only at a season's close.</summary>
+    ProgressNotNull,
+    /// <summary>A league state file is malformed, belongs to another career or another season.</summary>
+    LeagueStateInvalid,
+    /// <summary>The league state disagrees with the world's prestige (the B1 equality assertion).</summary>
+    LeagueStateMismatch,
+    /// <summary>A save would write a file under a name the career already lists (K8: a listed file
+    /// is never written to, renamed or deleted by the game).</summary>
+    ListedNameTaken,
 }
 
 /// <summary>Every history failure, carrying its classification. Tests assert

@@ -263,9 +263,9 @@ internal static partial class Program
             {
                 var p = Fresh("c4_default");
                 int made;
-                using (var store = HistoryStore.Open(p, WorldFingerprint(tiny))) made = store.StartYear;
+                using (var store = OpenCareer(p, tiny)) made = store.StartYear;
                 Check("C4a: a career created with no year starts in 2026 — the career file's default IS the season default",
-                      made == SeasonDefaultStartYear && HistoryStateV3.DefaultStartYear == SeasonDefaultStartYear,
+                      made == SeasonDefaultStartYear && HistoryStateV4.DefaultStartYear == SeasonDefaultStartYear,
                       Inv($"{made}"));
                 var legacy = RunSeasonCore(tiny, YearCheckSeed, configPath, verbose: false);
                 Check("C4b: a season with no career and no year is 2026", legacy.SeasonYear == SeasonDefaultStartYear);
@@ -287,8 +287,8 @@ internal static partial class Program
             // ══ C5 — THE EDGES ═══════════════════════════════════════════════════════════════
             {
                 Check("C5c: the career file's year bounds are the calendar's (1..9998)",
-                      HistoryStateV3.MinStartYear == CharmCalendar.MinSeasonStartYear
-                      && HistoryStateV3.MaxStartYear == CharmCalendar.MaxSeasonStartYear);
+                      HistoryStateV4.MinStartYear == CharmCalendar.MinSeasonStartYear
+                      && HistoryStateV4.MaxStartYear == CharmCalendar.MaxSeasonStartYear);
                 foreach (var (label, value, want) in new[]
                 {
                     ("--year 0", "0", "[YearOutOfDomain]"),
@@ -309,15 +309,23 @@ internal static partial class Program
                 Check("C5 --year with no year after it is refused by name",
                       none.Contains("SEASON ERROR [WrongType]", StringComparison.Ordinal), none.Trim());
 
-                var v2 = Fresh("c5_v2");
-                File.WriteAllText(v2, RawHistoryV2(WorldFingerprint(tiny), 4001, 7, 900));
-                var v2Before = File.ReadAllBytes(v2);
-                var v2Out = Capture(() => RunSeason(configPath, new[] { "season", tinyPath, "20260720", "--history", v2 }));
-                Check("C5 a v2 career is refused by the standing sentence, the file byte-identical, no log folder",
-                      v2Out.Contains(OlderCareerSentence, StringComparison.Ordinal)
-                      && File.ReadAllBytes(v2).SequenceEqual(v2Before)
-                      && !Directory.Exists(GameLogWriter.LogFolderFor(v2)),
-                      v2Out.Trim().Split('\n')[0]);
+                // ★ S125 — a v3 career (S119..S124) joins v2 in the refused set (C-60).
+                foreach (var (label, body) in new[]
+                {
+                    ("v2", RawHistoryV2(WorldFingerprint(tiny), 4001, 7, 900)),
+                    ("v3", RawHistoryV3(WorldFingerprint(tiny), 4001, 7, 900)),
+                })
+                {
+                    var old = Fresh("c5_" + label);
+                    File.WriteAllText(old, body);
+                    var oldBefore = File.ReadAllBytes(old);
+                    var oldOut = Capture(() => RunSeason(configPath, new[] { "season", tinyPath, "20260720", "--history", old }));
+                    Check($"C5 a {label} career is refused by the standing sentence, the file byte-identical, no log folder",
+                          oldOut.Contains(OlderCareerSentence, StringComparison.Ordinal)
+                          && File.ReadAllBytes(old).SequenceEqual(oldBefore)
+                          && !Directory.Exists(GameLogWriter.LogFolderFor(old)),
+                          oldOut.Trim().Split('\n')[0]);
+                }
 
                 // ★ The last year: a career started in 9998 plays its season (into 9999), and its
                 //   second season is refused by name with every file it owns byte-identical.

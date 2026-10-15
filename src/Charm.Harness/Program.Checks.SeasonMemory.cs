@@ -131,7 +131,7 @@ internal static partial class Program
                        ReadHostMemory(null), HostMemoryStatus.NoHistory, null, null, HostMemoryProblem.None);
 
             var c2Path = Path.Combine(scratch, "c2", "career.history.json");
-            using (var store = HistoryStore.Open(c2Path, WorldFingerprint(tiny)))
+            using (var store = OpenCareer(c2Path, tiny))
             {
                 CheckState("C2b: first season — attempt null, because season 0 was never a candidate",
                            ReadHostMemory(store), HostMemoryStatus.FirstSeason, null, null, HostMemoryProblem.None);
@@ -140,7 +140,7 @@ internal static partial class Program
                            ReadHostMemory(store), HostMemoryStatus.NoPublishedLog, null, 1, HostMemoryProblem.None);
                 // ★ S124 — numbers are held until published; C2d and C2e reopen this career and need
                 //   season 1 to have happened, so the hand-spent number is published as a close would.
-                store.PublishReservations();
+                store.PublishSeason(Array.Empty<string>(), HandSeasonRules);   // ★ S125 — a hand-spent season is published with a stand-in rules entry
             }
 
             // Two different kinds of bad candidate, kept apart on purpose — they are not the
@@ -151,14 +151,14 @@ internal static partial class Program
             Directory.CreateDirectory(c2LogDir);
             var c2Candidate = GameLogWriter.FinalPathFor(c2Path, 1);
             File.WriteAllBytes(c2Candidate, new byte[64]);
-            using (var store = HistoryStore.Open(c2Path, WorldFingerprint(tiny)))
+            using (var store = OpenCareer(c2Path, tiny))
             {
                 CheckState("C2d: a candidate too short to hold a header — Truncated",
                            ReadHostMemory(store), HostMemoryStatus.Unreadable, null, 1,
                            HostMemoryProblem.Truncated);
             }
             File.WriteAllBytes(c2Candidate, new byte[512]);
-            using (var store = HistoryStore.Open(c2Path, WorldFingerprint(tiny)))
+            using (var store = OpenCareer(c2Path, tiny))
             {
                 CheckState("C2e: a full-length candidate that is not a Charm log — UnsupportedVersion",
                            ReadHostMemory(store), HostMemoryStatus.Unreadable, null, 1,
@@ -185,7 +185,7 @@ internal static partial class Program
             HostMemory evenMemory;
             List<SeasonGame> even2;
             SeasonMemoryOutcome even2Outcome;
-            using (var store = HistoryStore.Open(evenPath, WorldFingerprint(evenWorld)))
+            using (var store = OpenCareer(evenPath, evenWorld))
             {
                 evenMemory = ReadHostMemory(store);
                 even2 = BuildSeasonSchedule(evenWorld, MemoryGoldenSeed, store, out even2Outcome);
@@ -602,7 +602,7 @@ internal static partial class Program
             PlayRetainedSeason(memWorld, MemoryGoldenSeed, gapPath, configPath);          // season 1, logged
             PlaySeasonWithoutRetention(memWorld, MemoryGoldenSeed, gapPath, configPath);   // season 2, no log
             List<SeasonGame> gap3; SeasonMemoryOutcome gap3Memory;
-            using (var store = HistoryStore.Open(gapPath, WorldFingerprint(memWorld)))
+            using (var store = OpenCareer(gapPath, memWorld))
                 gap3 = BuildSeasonSchedule(memWorld, MemoryGoldenSeed, store, out gap3Memory);
             //  ★ NARROWED AT S99. The old form also demanded the schedule equal season 1's,
             //  which was the frozen graph speaking again. Season 3 now ROTATES off season 1's
@@ -626,8 +626,9 @@ internal static partial class Program
             var victim = GameLogWriter.FinalPathFor(badPath, 2);
             var whole = File.ReadAllBytes(victim);
             File.WriteAllBytes(victim, whole[..(whole.Length / 2)]);   // truncated mid-file
+            RelistCareerForCheck(badPath);   // ★ S125 — saved that way, so the READER is what refuses it
             List<SeasonGame> bad3; SeasonMemoryOutcome bad3Memory;
-            using (var store = HistoryStore.Open(badPath, WorldFingerprint(memWorld)))
+            using (var store = OpenCareer(badPath, memWorld))
                 bad3 = BuildSeasonSchedule(memWorld, MemoryGoldenSeed, store, out bad3Memory);
             //  ★ NARROWED AT S99, for the same reason as C8ii and with the same replacement.
             Check("C8iii: a damaged candidate yields NO memory — never the valid season-1 log beside it, " +
@@ -647,7 +648,7 @@ internal static partial class Program
             PlayRetainedSeason(memWorld, MemoryGoldenSeed, stranger, configPath);
             File.Copy(GameLogWriter.FinalPathFor(stranger, 1),
                       GameLogWriter.FinalPathFor(alienPath, 2));
-            using (var store = HistoryStore.Open(alienPath, WorldFingerprint(memWorld)))
+            using (var store = OpenCareer(alienPath, memWorld))
             {
                 store.ReserveSeason();      // pretend season 2 happened
                 var alien = ReadHostMemory(store);
@@ -660,7 +661,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             //  C9 — determinism, and the peek's contract against a real reservation.
             // ════════════════════════════════════════════════════════════════════
-            using (var store = HistoryStore.Open(lifePath, WorldFingerprint(memWorld)))
+            using (var store = OpenCareer(lifePath, memWorld))
             {
                 var readA = ReadHostMemory(store);
                 var readB = ReadHostMemory(store);
@@ -708,8 +709,8 @@ internal static partial class Program
             var runA = PlayRetainedSeason(memWorld, MemoryGoldenSeed, isoA, configPath);
             var runB = PlayRetainedSeason(memWorld, MemoryGoldenSeed + 7717, isoB, configPath);
             HostMemory memA, memB;
-            using (var s = HistoryStore.Open(isoA, WorldFingerprint(memWorld))) memA = ReadHostMemory(s);
-            using (var s = HistoryStore.Open(isoB, WorldFingerprint(memWorld))) memB = ReadHostMemory(s);
+            using (var s = OpenCareer(isoA, memWorld)) memA = ReadHostMemory(s);
+            using (var s = OpenCareer(isoB, memWorld)) memB = ReadHostMemory(s);
             var basketballDiverged = !runA.Results.Select(r => r.HomeScore).SequenceEqual(
                                           runB.Results.Select(r => r.HomeScore));
             Check("C10a: the two careers really did play different basketball (the discriminator)",
@@ -810,7 +811,7 @@ internal static partial class Program
     private static SeasonRunOutcome PlayRetainedSeason(
         WorldFile world, long seed, string historyPath, string configPath)
     {
-        using var store = HistoryStore.Open(historyPath, WorldFingerprint(world));
+        using var store = OpenCareer(historyPath, world);
         return RunSeasonCore(world, seed, configPath, verbose: false, store, retainGameLog: true);
     }
 
@@ -820,7 +821,7 @@ internal static partial class Program
     private static SeasonRunOutcome PlaySeasonWithoutRetention(
         WorldFile world, long seed, string historyPath, string configPath)
     {
-        using var store = HistoryStore.Open(historyPath, WorldFingerprint(world));
+        using var store = OpenCareer(historyPath, world);
         // ★ S115 — a career season that keeps no log is now refused unless a check says so by
         //   name; this one does, and it builds fresh people (the pre-S115 behaviour) for the
         //   gap season, which is all T1 ever needed from it.

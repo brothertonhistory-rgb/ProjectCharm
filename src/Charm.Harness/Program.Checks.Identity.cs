@@ -64,19 +64,19 @@ internal static partial class Program
             {
                 var p = Fresh("b1");
                 PersonId[] first, second, third;
-                using (var h = HistoryStore.Open(p, tinyFp))
+                using (var h = OpenCareer(p, tiny))
                 {
                     first = h.ReservePersons(10);
                     // "Discard" five: they are simply dropped. Nothing tells the allocator,
                     // and that is the design — there is no retirement API to tell it with.
                     second = h.ReservePersons(4);
-                    h.PublishReservations();   // ★ S124 — numbers are held until published (a season's close)
+                    h.PublishSeason(Array.Empty<string>(), null);   // ★ S124 — numbers are held until published (a season's close)
                 }
                 // Persist -> reload -> issue again. Numbering continues; it never restarts.
-                using (var h2 = HistoryStore.Open(p, tinyFp))
+                using (var h2 = OpenCareer(p, tiny))
                 {
                     third = h2.ReservePersons(3);
-                    h2.PublishReservations();
+                    h2.PublishSeason(Array.Empty<string>(), null);
                 }
 
                 var all = first.Concat(second).Concat(third).ToList();
@@ -98,10 +98,10 @@ internal static partial class Program
                 //   played again with its own numbers.
                 var before = File.ReadAllBytes(p);
                 PersonId[] held, again;
-                using (var h3 = HistoryStore.Open(p, tinyFp))
+                using (var h3 = OpenCareer(p, tiny))
                     held = h3.ReservePersons(5);
                 var afterHeld = File.ReadAllBytes(p);
-                using (var h4 = HistoryStore.Open(p, tinyFp))
+                using (var h4 = OpenCareer(p, tiny))
                     again = h4.ReservePersons(5);
                 Check("B1 ★ S124 — an unpublished reservation is handed out again after a reload, number for number",
                       held.SequenceEqual(again) && held.Intersect(all).Count() == 0,
@@ -194,9 +194,9 @@ internal static partial class Program
 
                 Dictionary<int, PersonId> Run(string path)
                 {
-                    using var h = HistoryStore.Open(path, tinyFp);
+                    using var h = HistoryStore.Open(path, tinyFp, NoLeague);
                     var res = RunDivvyDraft(tiny, seed, h);
-                    h.PublishReservations();   // ★ S124 — held until published, so the files below can advance
+                    h.PublishSeason(Array.Empty<string>(), null);   // ★ S124 — held until published, so the files below can advance
                     return res.PersonIds!.Keys.ToDictionary(k => k, k => res.PersonIds![k]);
                 }
                 var mapA = Run(a);
@@ -213,7 +213,7 @@ internal static partial class Program
             // ── B4 — transport bijection, scoped to one cohort and one season. ───────
             {
                 var p = Fresh("b4");
-                using var h = HistoryStore.Open(p, tinyFp);
+                using var h = OpenCareer(p, tiny);
                 var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true);
                 var recs = outcome.League.PlayerSeasons;
 
@@ -236,9 +236,9 @@ internal static partial class Program
             {
                 var p = Fresh("b5");
                 List<SeasonGameResult> a, b;
-                using (var h = HistoryStore.Open(p, tinyFp))
+                using (var h = OpenCareer(p, tiny))
                     a = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true).Results;
-                using (var h = HistoryStore.Open(p, tinyFp))
+                using (var h = OpenCareer(p, tiny))
                     b = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true).Results;
 
                 var seasonsA = a.Select(r => r.SeasonId!.Value).Distinct().ToList();
@@ -288,7 +288,7 @@ internal static partial class Program
             // ── B7 — domain guards. ─────────────────────────────────────────────────
             {
                 var p = Fresh("b7");
-                using (HistoryStore.Open(p, tinyFp)) { }
+                using (OpenCareer(p, tiny)) { }
 
                 Check("B7 a default identity is invalid and is refused at a boundary",
                       ErrorOf(() => IdentityGuard.Require(default(PersonId), "a test boundary"))
@@ -303,18 +303,18 @@ internal static partial class Program
                     WriteRawHistoryForCheck(f, tinyFp, bad, 1, 1);
                     Check($"B7 a stored next-person of {bad.ToString(CultureInfo.InvariantCulture)} "
                           + "fails the load, classified",
-                          ErrorOf(() => HistoryStore.Open(f, tinyFp).Dispose())
+                          ErrorOf(() => HistoryStore.Open(f, tinyFp, NoLeague).Dispose())
                               == HistoryError.CounterOutOfDomain);
                 }
                 var fMax = Fresh("b7_max");
                 WriteRawHistoryForCheck(fMax, tinyFp, long.MaxValue, 1, 1);
                 Check("B7 a stored next-person of long.MaxValue fails the load, classified",
-                      ErrorOf(() => HistoryStore.Open(fMax, tinyFp).Dispose())
+                      ErrorOf(() => HistoryStore.Open(fMax, tinyFp, NoLeague).Dispose())
                           == HistoryError.CounterOutOfDomain);
 
                 var fNear = Fresh("b7_near");
                 WriteRawHistoryForCheck(fNear, tinyFp, long.MaxValue - 5, 1, 1);
-                using (var h = HistoryStore.Open(fNear, tinyFp))
+                using (var h = HistoryStore.Open(fNear, tinyFp, NoLeague))
                 {
                     var one = h.ReservePersons(1);
                     Check("B7 a valid single reservation near the ceiling succeeds",
@@ -344,7 +344,7 @@ internal static partial class Program
                 var legacy = RunSeasonCore(tiny, seed, configPath, verbose: false);
                 var p = Fresh("b8");
                 SeasonRunOutcome hist;
-                using (var h = HistoryStore.Open(p, tinyFp))
+                using (var h = OpenCareer(p, tiny))
                     hist = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true);
 
                 string Surface(SeasonRunOutcome o)
@@ -411,7 +411,7 @@ internal static partial class Program
             // ── B9 — PoolId untouched. ──────────────────────────────────────────────
             {
                 var p = Fresh("b9");
-                using var h = HistoryStore.Open(p, tinyFp);
+                using var h = OpenCareer(p, tiny);
                 var withHist = RunDivvyDraft(tiny, seed, h);
                 var without = RunDivvyDraft(tiny, seed);
                 var n = tiny.Schools.Count;
@@ -436,13 +436,13 @@ internal static partial class Program
             {
                 var p = Fresh("b10");
                 Check("B10 absent -> created as a valid history", !File.Exists(p));
-                using (HistoryStore.Open(p, tinyFp)) { }
+                using (OpenCareer(p, tiny)) { }
                 Check("B10 the created file exists and parses", File.Exists(p));
 
                 // ★ The golden is compared against what the STORE ACTUALLY WRITES, never
                 // against a second hand-rolled copy of the same format — that would be a
                 // check comparing this file's opinion of the format to its own opinion.
-                // ★ S119 — THE GOLDEN IS v3, because a history created today is BORN v3 (the
+                // ★ S119 — THE GOLDEN WAS v3, because a history created then was BORN v3 (the
                 // year the career starts in sits beside its counters). The v2 golden retires with
                 // the v2 reader, C-60; a v1 or v2 career is refused by name — the 'older version'
                 // cases below. The golden is HAND-WRITTEN at S119, not captured from the writer, so
@@ -451,51 +451,79 @@ internal static partial class Program
                 // from Guid.NewGuid() and a golden cannot chase a random value. ★ S122 — the fixed-id
                 // door has two callers: this one, and Phase 113 C2 (a two-season career compared
                 // against the S121 build and against itself played in the old order).
-                var golden =Path.Combine(AppContext.BaseDirectory, "tools", "history_v3_golden.json");
+                // ★ S125 — THE GOLDEN IS v4: a career is born listing its league-0 by hash, and ends
+                //   with its own fingerprint line. Both goldens are hand-written (computed outside the
+                //   C# writer), the league one from two schools handed in out of order.
+                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v4_golden.json");
+                var leagueGolden = Path.Combine(AppContext.BaseDirectory, "tools", "league_v1_golden.json");
                 var goldenFp = "sha256-v1:" + new string('0', 64);
                 var pGolden = Fresh("b10_golden");
                 using (HistoryStore.UseFixedHistoryIdForTests("0123456789abcdef0123456789abcdef"))
-                using (HistoryStore.Open(pGolden, goldenFp)) { }
-                Check("B10 canonical output matches the committed golden v3 fixture "
-                      + "(key order, 2-space indent, UTF-8 no BOM, final newline)",
+                using (HistoryStore.Open(pGolden, goldenFp, GoldenLeague)) { }
+                Check("B10 canonical output matches the committed golden v4 fixture "
+                      + "(key order, 2-space indent, UTF-8 no BOM, final newline, the fingerprint line)",
                       File.Exists(golden)
                       && File.ReadAllBytes(golden).SequenceEqual(File.ReadAllBytes(pGolden)),
                       File.Exists(golden) ? "" : "golden fixture missing");
+                var pGoldenLeague = LeagueStateFile.PathFor(pGolden, 0);
+                Check("B10 ★ S125 — the career is born with its league-0, and it matches the committed league golden "
+                      + "(sorted by school, the same canonical discipline)",
+                      File.Exists(leagueGolden) && File.Exists(pGoldenLeague)
+                      && File.ReadAllBytes(leagueGolden).SequenceEqual(File.ReadAllBytes(pGoldenLeague)),
+                      File.Exists(leagueGolden) ? "" : "league golden fixture missing");
 
                 // Round-trip: write, read, write again -> identical bytes.
                 var b1 = File.ReadAllBytes(p);
-                using (HistoryStore.Open(p, tinyFp)) { }
+                using (OpenCareer(p, tiny)) { }
                 Check("B10 validation without reservation leaves the file byte-identical",
                       File.ReadAllBytes(p).SequenceEqual(b1));
 
                 // The world file is never touched by any history operation.
                 var worldBefore = File.ReadAllBytes(tinyPath);
                 var p2 = Fresh("b10b");
-                using (var h = HistoryStore.Open(p2, tinyFp)) { h.ReservePersons(5); h.ReserveSeason(); }
+                using (var h = OpenCareer(p2, tiny)) { h.ReservePersons(5); h.ReserveSeason(); }
                 Check("B10 the world file's bytes are untouched by every history operation",
                       File.ReadAllBytes(tinyPath).SequenceEqual(worldBefore));
 
                 // Every rejection case, each with its own classification.
                 var cases = new (string Name, string Body, HistoryError Want)[]
                 {
-                    ("malformed",  "{ not json",                                   HistoryError.MalformedJson),
+                    ("malformed",  "{ not json\n",                                 HistoryError.MalformedJson),
                     ("unknown",    RawHistory(tinyFp, 1, 1, 1, extra: "\"nope\": 1"), HistoryError.UnknownKey),
-                    ("missing",    "{\"format\":\"charm-history\",\"schemaVersion\":3}", HistoryError.MissingKey),
+                    ("missing",    "{\"format\":\"charm-history\",\"schemaVersion\":4}\n", HistoryError.MissingKey),
                     ("format",     RawHistory(tinyFp, 1, 1, 1).Replace("charm-history", "other"), HistoryError.WrongFormat),
-                    ("version",    RawHistory(tinyFp, 1, 1, 1).Replace("\"schemaVersion\": 3", "\"schemaVersion\": 7"), HistoryError.UnsupportedVersion),
+                    ("version",    RawHistory(tinyFp, 1, 1, 1).Replace("\"schemaVersion\": 4", "\"schemaVersion\": 7"), HistoryError.UnsupportedVersion),
                     // ★ S119 — a stored start year outside the calendar's seasons is damage, named.
                     ("startyear",  RawHistory(tinyFp, 1, 1, 1).Replace("\"startYear\": 2026", "\"startYear\": 0"), HistoryError.YearOutOfDomain),
                     ("wrongtype",  RawHistory(tinyFp, 1, 1, 1).Replace("\"nextGameId\": 1", "\"nextGameId\": \"x\""), HistoryError.WrongType),
                 };
+                // ★ S125 — every body is SEALED with its fingerprint line, so each case reaches the
+                //   error it names rather than being called torn. The two torn cases follow.
                 foreach (var (name, body, want) in cases)
                 {
                     var f = Fresh("b10_" + name);
-                    File.WriteAllText(f, body);
+                    File.WriteAllBytes(f, SealCareer(body));
                     var before = File.ReadAllBytes(f);
-                    var got = ErrorOf(() => HistoryStore.Open(f, tinyFp).Dispose());
+                    var got = ErrorOf(() => HistoryStore.Open(f, tinyFp, NoLeague).Dispose());
                     Check($"B10 rejection '{name}' stops loudly as {want}", got == want, got?.ToString());
                     Check($"B10 rejection '{name}' modified nothing",
                           File.ReadAllBytes(f).SequenceEqual(before));
+                }
+
+                // ★ S125 — TORN: a career file with no fingerprint line, and one whose line does not match
+                //   its bytes. Each refused as Torn (no backup to recover from) and left untouched.
+                foreach (var (name, bytes) in new[]
+                {
+                    ("no-trailer", Encoding.UTF8.GetBytes(RawHistory(tinyFp, 1, 1, 1))),
+                    ("wrong-trailer", SealCareer(RawHistory(tinyFp, 1, 1, 1)).Select((b, i) => i == 40 ? (byte)'9' : b).ToArray()),
+                })
+                {
+                    var f = Fresh("b10_torn_" + name);
+                    File.WriteAllBytes(f, bytes);
+                    var got = ErrorOf(() => HistoryStore.Open(f, tinyFp, NoLeague).Dispose());
+                    Check($"B10 ★ S125 — a career file with {(name == "no-trailer" ? "no fingerprint line" : "a fingerprint line that does not match")} "
+                          + "is refused as Torn, and modified nothing",
+                          got == HistoryError.Torn && File.ReadAllBytes(f).SequenceEqual(bytes), got?.ToString());
                 }
 
                 // ★ S118.2 — an OLDER career (schemaVersion 1, saved before S90) is refused BY
@@ -509,6 +537,7 @@ internal static partial class Program
                 {
                     ("v1", RawHistoryV1(tinyFp, 4001, 7, 900)),
                     ("v2", RawHistoryV2(tinyFp, 4001, 7, 900)),
+                    ("v3", RawHistoryV3(tinyFp, 4001, 7, 900)),   // ★ S125 — v3 joins them (C-60)
                 })
                 {
                     static HistoryException? RefusalOf(Action a)
@@ -519,8 +548,8 @@ internal static partial class Program
                     var fOld = Fresh("b10_older_" + label);
                     File.WriteAllText(fOld, body);
                     var oldBefore = File.ReadAllBytes(fOld);
-                    var refusal = RefusalOf(() => HistoryStore.Open(fOld, tinyFp).Dispose());
-                    var future = RefusalOf(() => HistoryStore.Open(Fresh("b10_version"), tinyFp).Dispose());
+                    var refusal = RefusalOf(() => HistoryStore.Open(fOld, tinyFp, NoLeague).Dispose());
+                    var future = RefusalOf(() => HistoryStore.Open(Fresh("b10_version"), tinyFp, NoLeague).Dispose());
                     Check($"B10 rejection 'older version' (a {label} career) stops loudly as UnsupportedVersion",
                           refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
                     Check($"B10 rejection 'older version' ({label}) says so by name — 'saved by an older version of "
@@ -535,18 +564,18 @@ internal static partial class Program
                 var fWrongWorld = Fresh("b10_world");
                 WriteRawHistoryForCheck(fWrongWorld, "sha256-v1:" + new string('a', 64), 1, 1, 1);
                 Check("B10 a history bound to a different world is refused",
-                      ErrorOf(() => HistoryStore.Open(fWrongWorld, tinyFp).Dispose())
+                      ErrorOf(() => HistoryStore.Open(fWrongWorld, tinyFp, NoLeague).Dispose())
                           == HistoryError.FingerprintMismatch);
 
                 Check("B10 a path that is an existing directory is rejected",
-                      ErrorOf(() => HistoryStore.Open(sandbox, tinyFp).Dispose())
+                      ErrorOf(() => HistoryStore.Open(sandbox, tinyFp, NoLeague).Dispose())
                           == HistoryError.PathIsDirectory);
 
                 var pLock = Fresh("b10_lock");
-                using (HistoryStore.Open(pLock, tinyFp))
+                using (OpenCareer(pLock, tiny))
                 {
                     Check("B10 a second opener cannot take a held history lock",
-                          ErrorOf(() => HistoryStore.Open(pLock, tinyFp).Dispose())
+                          ErrorOf(() => OpenCareer(pLock, tiny).Dispose())
                               == HistoryError.LockUnavailable);
                 }
             }
@@ -579,7 +608,7 @@ internal static partial class Program
     //  point: a check that could only build a file with the writer could never test what
     //  the reader does with a file the writer would not have produced.
 
-    // ★ S118.2 — the hand-built files are in the CURRENT format (v2), with one fixed lineage
+    // ★ S118.2 — the hand-built files are in the CURRENT format (★ S125: v4, sealed, beside an empty league-0), with one fixed lineage
     //   label. Before S118.2 they were v1 and reached the reader through the upgrade; with the
     //   upgrade retired (C-60) a v1 body is refused for being older, so every rejection case
     //   below would have tested the older-version refusal instead of the error it names.
@@ -592,7 +621,110 @@ internal static partial class Program
     private const string OlderCareerSentence =
         "this career was saved by an older version of the game — start a new career";
 
+    /// <summary>★ S125 — the league a hand-built career lists: none. A store-level check reaches the
+    /// store directly, so it names the league it means; nothing here plays a season.</summary>
+    private static readonly SchoolPrestige[] NoLeague = Array.Empty<SchoolPrestige>();
+
+    /// <summary>★ S125 — the league the born-v4 golden is created with: two schools, handed in out of
+    /// order, so the golden also proves the league state is written sorted by school.</summary>
+    private static readonly SchoolPrestige[] GoldenLeague = { new(2, 60), new(1, 50) };
+
+    /// <summary>★ S125 (K4) — the settings hash and build stamp every career-file pin records, through
+    /// <see cref="HistoryStore.UseFixedRulesForTests"/>: the real stamp changes with every build.</summary>
+    private const string CheckFixedConfigSha = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
+    /// <inheritdoc cref="CheckFixedConfigSha"/>
+    private const string CheckFixedRulesStamp = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+    /// <summary>★ S125 — the stand-in rules entry for a season the suite spends and publishes by hand
+    /// (Phase 87 C2). A real close records the real one.</summary>
+    private static readonly SeasonRules HandSeasonRules = new("2026-11-01", new string('0', 64), new string('0', 64));
+
+    /// <summary>★ S125 — the fingerprint line a career file ends with, computed over the exact bytes
+    /// before it. Written here, not borrowed from the store, so a hand-built file is the suite's own
+    /// expectation of the format.</summary>
+    private static byte[] SealCareer(string body)
+    {
+        var payload = Encoding.UTF8.GetBytes(body);
+        var hex = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload)).ToLowerInvariant();
+        return payload.Concat(Encoding.ASCII.GetBytes("sha256:" + hex + "\n")).ToArray();
+    }
+
+    /// <summary>★ S125 — RE-SEAL A CAREER AROUND A PLANTED FILE. Many checks damage or replace a season
+    /// file to prove a READER refuses it by name. Since S125 the career's open refuses any listed file whose
+    /// bytes changed after the save (Phase 116 C2), which would stop those checks before the reader runs.
+    /// The readers' refusals still matter — they are what catches a file that was SAVED wrong, which no
+    /// hash can — so these checks re-list the career's files at their current bytes (a listed file that is
+    /// gone is dropped from the list) and re-seal the career file: the damage now looks like a file saved
+    /// that way, which is exactly what the reader is there to refuse. A check-only helper; the store has no
+    /// such door.</summary>
+    private static void RelistCareerForCheck(string careerPath)
+    {
+        var bytes = File.ReadAllBytes(careerPath);
+        var node = System.Text.Json.Nodes.JsonNode.Parse(bytes.AsSpan(0, bytes.Length - 72))!.AsObject();
+        var files = node["files"]!.AsArray();
+        for (var i = files.Count - 1; i >= 0; i--)
+        {
+            var listed = (string)files[i]!["path"]!;
+            var onDisk = HistoryStore.ResolveListed(careerPath, listed);
+            if (!File.Exists(onDisk)) { files.RemoveAt(i); continue; }
+            files[i]!["sha256"] = HistoryStore.HashFile(onDisk);
+        }
+        var text = node.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }).Replace("\r\n", "\n") + "\n";
+        File.WriteAllBytes(careerPath, SealCareer(text));
+    }
+
+    /// <summary>★ S125 — A CAREER FILE PIN THAT HOLDS ON ANY MACHINE. A v4 career file lists the SHA-256 of
+    /// every season file, and two of them — the season log (its roster section) and the scouting file — store
+    /// decimals as raw bits, some through library math (Math.Tanh and kin) that is not bit-portable between
+    /// Windows and Linux (S81.3). So a pin captured in the sandbox may not pin the whole file. This digest is
+    /// the career file's payload with the hash of every `gamelog/` entry masked; everything else stays — the
+    /// numbers spent, the rules, every listed path, and the hashes of the integer-only files (event records,
+    /// league states). The masked files are pinned by their decoded blocks (Phase 113 C2a) and compared byte for
+    /// byte on one machine (Phase 113 C2d). The trailer is checked first: a torn file has no digest.</summary>
+    private static string PortableCareerDigest(byte[] career)
+    {
+        var payload = career.AsSpan(0, Math.Max(0, career.Length - 72)).ToArray();
+        var hex = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload)).ToLowerInvariant();
+        if (career.Length < 72 || Encoding.ASCII.GetString(career, career.Length - 72, 72) != "sha256:" + hex + "\n")
+            return "TORN";
+        var node = System.Text.Json.Nodes.JsonNode.Parse(payload)!.AsObject();
+        foreach (var f in node["files"]!.AsArray())
+            if (((string)f!["path"]!).StartsWith("gamelog/", StringComparison.Ordinal))
+                f["sha256"] = "(this machine)";
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            Encoding.UTF8.GetBytes(node.ToJsonString()))).ToLowerInvariant();
+    }
+
+    /// <summary>★ S125 — the league-0 a hand-built career lists (an empty league, this lineage).</summary>
+    private static byte[] RawLeagueZero() => LeagueStateFile.Encode(CheckHistoryId, 0, NoLeague);
+
+    /// <summary>★ S125 — a v4 career file's body, WITHOUT its fingerprint line (so a case can edit it
+    /// first and then seal it, or leave it unsealed to be torn). It lists the empty league-0.</summary>
     private static string RawHistory(string fp, long person, long season, long game, string? extra = null)
+        => "{\n"
+         + "  \"format\": \"charm-history\",\n"
+         + "  \"schemaVersion\": 4,\n"
+         + $"  \"historyId\": \"{CheckHistoryId}\",\n"
+         + $"  \"worldFingerprint\": \"{fp}\",\n"
+         + "  \"startYear\": 2026,\n"
+         + $"  \"nextPersonId\": {person.ToString(CultureInfo.InvariantCulture)},\n"
+         + $"  \"nextSeasonId\": {season.ToString(CultureInfo.InvariantCulture)},\n"
+         + $"  \"nextGameId\": {game.ToString(CultureInfo.InvariantCulture)},\n"
+         + "  \"files\": [\n"
+         + "    {\n"
+         + "      \"path\": \"league/league-0.json\",\n"
+         + $"      \"sha256\": \"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(RawLeagueZero())).ToLowerInvariant()}\"\n"
+         + "    }\n"
+         + "  ],\n"
+         + "  \"seasons\": [],\n"
+         + "  \"progress\": null"
+         + (extra is null ? "" : ",\n  " + extra)
+         + "\n}\n";
+
+    /// <summary>★ S125 — a career file in the S119..S124 format (v3), written ONLY to prove it is
+    /// refused by name and left untouched (Phase 80 B10, Phase 81 A6, Phase 110 C5).</summary>
+    private static string RawHistoryV3(string fp, long person, long season, long game)
         => "{\n"
          + "  \"format\": \"charm-history\",\n"
          + "  \"schemaVersion\": 3,\n"
@@ -602,7 +734,6 @@ internal static partial class Program
          + $"  \"nextPersonId\": {person.ToString(CultureInfo.InvariantCulture)},\n"
          + $"  \"nextSeasonId\": {season.ToString(CultureInfo.InvariantCulture)},\n"
          + $"  \"nextGameId\": {game.ToString(CultureInfo.InvariantCulture)}"
-         + (extra is null ? "" : ",\n  " + extra)
          + "\n}\n";
 
     /// <summary>★ S119 — a career file in the S90..S118 format (no start year), written ONLY to
@@ -632,8 +763,14 @@ internal static partial class Program
          + $"  \"nextGameId\": {game.ToString(CultureInfo.InvariantCulture)}"
          + "\n}\n";
 
+    /// <summary>★ S125 — a sealed v4 career beside its league-0, as a store would leave it.</summary>
     private static void WriteRawHistoryForCheck(string path, string fp, long person, long season, long game)
-        => File.WriteAllBytes(path, Encoding.UTF8.GetBytes(RawHistory(fp, person, season, game)));
+    {
+        var league = LeagueStateFile.PathFor(path, 0);
+        Directory.CreateDirectory(Path.GetDirectoryName(league)!);
+        File.WriteAllBytes(league, RawLeagueZero());
+        File.WriteAllBytes(path, SealCareer(RawHistory(fp, person, season, game)));
+    }
 
     /// <summary>The three counters, read straight off the file. Harness-local (S118.2): it used
     /// to borrow the engine's retired v1 record, with an empty fingerprint.</summary>
