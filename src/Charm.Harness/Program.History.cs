@@ -35,6 +35,29 @@ internal static partial class Program
     /// <summary>★ S119 — the year a career (or a single season with no career) starts in.</summary>
     private const string YearArgFlag = "--year";
 
+    /// <summary>★ S127 — the day to play a season through and save it, mid-way, to its career.</summary>
+    private const string ThroughArgFlag = "--through";
+
+    /// <summary>★ S127 — pull `--through &lt;yyyy-MM-dd&gt;` off the `season` command line, or null. Only the
+    /// `season` command reads it (the stacked command saves nothing).</summary>
+    private static DateOnly? ParseThroughArg(string[] args, int firstOptional)
+    {
+        for (var i = firstOptional; i < args.Length; i++)
+        {
+            if (!string.Equals(args[i], ThroughArgFlag, StringComparison.Ordinal)) continue;
+            if (i + 1 >= args.Length
+                || !DateOnly.TryParseExact(args[i + 1], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+                throw new HistoryException(HistoryError.WrongType,
+                    $"{ThroughArgFlag} needs a day after it, as yyyy-MM-dd — the last day to play before saving, e.g. {ThroughArgFlag} 2027-02-10.");
+            return day;
+        }
+        return null;
+    }
+
+    private static bool IsThroughArgAt(string[] args, int index)
+        => string.Equals(args[index], ThroughArgFlag, StringComparison.Ordinal)
+           || (index > 0 && string.Equals(args[index - 1], ThroughArgFlag, StringComparison.Ordinal));
+
     /// <summary>The world's canonical fingerprint, self-describing so a later scheme can
     /// be told apart from this one at a glance rather than by length.</summary>
     private static string WorldFingerprint(WorldFile world)

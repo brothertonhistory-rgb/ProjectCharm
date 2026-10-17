@@ -1807,18 +1807,28 @@ internal static partial class Program
         if (args.Length < 3)
         {
             Console.WriteLine("usage: season <world.json> <seed> [minutes-floor: 100|250|500|900] " +
-                              "[--history <path>] [--year <YYYY>]");
+                              "[--history <path>] [--year <YYYY>] [--through <yyyy-MM-dd>]");
             Console.WriteLine("  --history binds this season to a named career file. There is NO " +
                               "default: leave it off and the run behaves exactly as it always has.");
             Console.WriteLine("  --year names the year a career's FIRST season opens in (1..9998; default 2026). " +
                               "Each later season is the next year. Without --history it is the year this one season is played.");
+            Console.WriteLine("  --through plays the season through that day and saves it to the career, mid-way; the next run " +
+                              "with the same career and seed picks it up the following day. Needs --history.");
             return;
         }
         // S89: named, so it does not collide with the positional minutes floor at args[3].
         string? historyPath;
         int? startYear;
-        try { historyPath = ParseHistoryArg(args, 3); startYear = ParseYearArg(args, 3); }
+        DateOnly? through;
+        try { historyPath = ParseHistoryArg(args, 3); startYear = ParseYearArg(args, 3); through = ParseThroughArg(args, 3); }
         catch (HistoryException hx) { Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}"); return; }
+        // ★ S127 — a mid-season save lives in a career; with no career there is nowhere to resume from.
+        if (through is not null && historyPath is null)
+        {
+            Console.WriteLine($"SEASON ERROR: {ThroughArgFlag} saves a season mid-way to a career, and needs {HistoryArgFlag} <career>. " +
+                              "Nothing was played.");
+            return;
+        }
         // S77: reporting-only leaderboard filter. Applied after the roll-up is complete; it
         // touches neither simulation nor accumulation, and deliberately does NOT live in
         // config.json (Phase 71 parity-locks that file's key names).
@@ -1826,6 +1836,7 @@ internal static partial class Program
         for (var i = 3; i < args.Length; i++)
         {
             if (IsHistoryArgAt(args, i)) continue;   // S89: the flag and its path are not the floor
+            if (IsThroughArgAt(args, i)) continue;   // ★ S127: nor --through and its day
             if (!int.TryParse(args[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
                 || !SeasonMinuteTiers.Contains(minuteFloor))
             {
@@ -1865,16 +1876,71 @@ internal static partial class Program
         SeasonRunOutcome run;
         try
         {
-            // Preflight only — deliberately UNNUMBERED. RunSeasonCore builds the real
-            // schedule; numbering here as well would burn a season number every run.
-            schedule = BuildSeasonSchedule(world, seed);   // preflight + build (fails loudly)
-            PrintSeasonBanner(world, args[1], seed, schedule.Count);
-            // S90: the season page retains a per-game log whenever it is bound to a career.
-            // The page itself gains NO output — the log is a file beside the history, and the
-            // printed season is byte-identical to its pre-S90 self (Phase 81 A3).
-            // ★ S119 — a career's year comes off its file; a season with no career plays --year.
-            run = RunSeasonCore(world, seed, engineConfigPath, verbose: true, history,
-                                retainGameLog: true, seasonYear: history is null ? startYear : null);
+            // ★ S127 — the season, as three steps over the season run: begin (or RESUME a season the career
+            //   saved mid-way), play through the last day (or through --through and SAVE), close. With no
+            //   --through and no saved season these are exactly RunSeasonCore's three steps, so a season nobody
+            //   saves mid-way prints and writes what it always has.
+            SeasonRun season;
+            if (history?.Progress is { } saved)
+            {
+                // A career with a season in progress resumes it: no preflight, no banner, no set-up — the save
+                // holds all of it. Every refusal leaves the career exactly as it was.
+                var savedNext = DateOnly.ParseExact(saved.NextDay, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                var savedK = saved.Save.ToString(CultureInfo.InvariantCulture);
+                var savedN = saved.Season.ToString(CultureInfo.InvariantCulture);
+                if (seed != saved.SeasonSeed)
+                {
+                    Console.WriteLine($"SEASON ERROR: this career saved season {savedN} mid-way under seed " +
+                                      $"{saved.SeasonSeed.ToString(CultureInfo.InvariantCulture)}; this run was given seed " +
+                                      $"{seed.ToString(CultureInfo.InvariantCulture)}. Resume it with seed " +
+                                      $"{saved.SeasonSeed.ToString(CultureInfo.InvariantCulture)}. Nothing was played; the career is unchanged.");
+                    history.Dispose();
+                    return;
+                }
+                if (through is { } t0 && t0 < savedNext)
+                {
+                    Console.WriteLine($"SEASON ERROR: {ThroughArgFlag} {t0:yyyy-MM-dd} is before season {savedN}'s next day, " +
+                                      $"{saved.NextDay}. Nothing was played; the career is unchanged.");
+                    history.Dispose();
+                    return;
+                }
+                Console.WriteLine($"Resuming season {savedN} on {saved.NextDay} (save {savedK}).");
+                season = SeasonRun.Resume(history.ReadProgressSnapshot(), world, history, engineConfigPath, verbose: true);
+            }
+            else
+            {
+                // Preflight only — deliberately UNNUMBERED. The season run builds the real
+                // schedule; numbering here as well would burn a season number every run.
+                schedule = BuildSeasonSchedule(world, seed);   // preflight + build (fails loudly)
+                PrintSeasonBanner(world, args[1], seed, schedule.Count);
+                // S90: the season page retains a per-game log whenever it is bound to a career.
+                // The page itself gains NO output — the log is a file beside the history, and the
+                // printed season is byte-identical to its pre-S90 self (Phase 81 A3).
+                // ★ S119 — a career's year comes off its file; a season with no career plays --year.
+                season = SeasonBegin(world, seed, engineConfigPath, verbose: true, new SeasonRunOptions(
+                    History: history, RetainGameLog: true, SeasonYear: history is null ? startYear : null));
+                if (through is { } t1 && t1 < season.FirstLegalDay.AddDays(-1))
+                {
+                    season.Dispose();
+                    Console.WriteLine($"SEASON ERROR: {ThroughArgFlag} {t1:yyyy-MM-dd} is before this season's first day, " +
+                                      $"{season.FirstLegalDay:yyyy-MM-dd}. Nothing was played; the career is unchanged.");
+                    history?.Dispose();
+                    return;
+                }
+            }
+            using (season)
+            {
+                if (through is { } t && t < season.LastLegalDay)
+                {
+                    season.AdvanceThrough(t);
+                    var block = season.SaveProgress();
+                    Console.WriteLine($"Saved: season {block.Season.ToString(CultureInfo.InvariantCulture)} through " +
+                                      $"{t:yyyy-MM-dd} (save {block.Save.ToString(CultureInfo.InvariantCulture)}).");
+                    return;   // the finally below releases the career
+                }
+                season.AdvanceThrough(season.LastLegalDay);
+                run = season.Finish();
+            }
         }
         catch (HistoryException hx)
         {

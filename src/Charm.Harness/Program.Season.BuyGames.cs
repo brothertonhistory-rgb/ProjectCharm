@@ -158,6 +158,8 @@ internal static partial class Program
                                           game.HomeId, game.AwayId, winner, played.FixtureOrdinal);
         }
 
+        public override bool? HasPlayed(int local) => _rows[local] is not null;
+
         public override void AssertComplete()
         {
             var missing = Array.FindIndex(_rows, r => r is null);

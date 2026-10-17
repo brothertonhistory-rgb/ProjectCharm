@@ -105,7 +105,7 @@ internal static partial class Program
         new("SeasonRun", "eventRecordBody", "Byte[]", SeasonStateCategory.ImmutableSetup, "★ S124 — the NotPlayed record, written at the close"),
         new("SeasonRun", "keepsLog", "bool", SeasonStateCategory.ImmutableSetup, "★ S124"),
         new("SeasonRun", "logRoster", "List<RosterEntryV2>", SeasonStateCategory.ImmutableSetup, "★ S124 — the log's roster, written at the close"),
-        new("SeasonRun", "verbose", "bool", SeasonStateCategory.ImmutableSetup, "★ S124 — the close prints what it set aside"),
+        new("SeasonRun", "verbose", "bool", SeasonStateCategory.ImmutableSetup, "rebound from the caller (★ S127 B2a)"),
         new("SeasonRun", "divvy", "DivvyResult", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "people", "PeopleSummary", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "development", "DevelopmentStep", SeasonStateCategory.ImmutableSetup),
@@ -114,6 +114,7 @@ internal static partial class Program
         new("SeasonRun", "cfgs", "GenEngineConfigs", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "roadShave", "int", SeasonStateCategory.ImmutableSetup),
         new("SeasonRun", "baseSeed", "int", SeasonStateCategory.ImmutableSetup),
+        new("SeasonRun", "seasonSeed", "long", SeasonStateCategory.ImmutableSetup, "★ S127 — the seed as given; a mid-season save records it"),
         new("SeasonRun", "fingerprint", "string", SeasonStateCategory.Derived, "the schedule's hash"),
         new("SeasonRun", "datedFingerprint", "string", SeasonStateCategory.Derived, "the dated schedule's hash"),
         new("SeasonRun", "eventGameCount", "int", SeasonStateCategory.Derived),
@@ -145,6 +146,7 @@ internal static partial class Program
         new("SeasonRun", "finished", "bool", SeasonStateCategory.Mutable, "lifecycle; a save is only taken of an open run"),
         new("SeasonRun", "disposed", "bool", SeasonStateCategory.Mutable, "lifecycle"),
         new("SeasonRun", "faultedOn", "string", SeasonStateCategory.Mutable, "lifecycle"),
+        new("SeasonRun", "advancing", "bool", SeasonStateCategory.Mutable, "★ S127 — lifecycle: a day or the close is running, so no save"),
 
         // ── SeasonCalendarRun ──────────────────────────────────────────────────────
         new("SeasonCalendarRun", "_sources", "IReadOnlyList<SeasonGameSource>", SeasonStateCategory.SharedReference, "the same source objects the season run holds"),

@@ -90,6 +90,11 @@ internal static partial class Program
         /// bookkeeping did not close (a bracket with a place unassigned, a tournament with no
         /// champion).</summary>
         public virtual void AssertComplete() { }
+
+        /// <summary>★ S127 — whether this source's own bookkeeping says game <paramref name="local"/> has
+        /// been played, or null for a source that keeps none (the league slate). A restored season is
+        /// refused when any source disagrees with the walk (K8).</summary>
+        public virtual bool? HasPlayed(int local) => null;
     }
 
     /// <summary>★ S122 — a source whose every fixture is known before November 1: the league
@@ -409,6 +414,43 @@ internal static partial class Program
             }
             _finished = true;
             return new SeasonCalendarPlay(_playOrder, _firstLegalDay, _lastLegalDay);
+        }
+
+        /// <summary>★ S127 — true when the walk plays in fixture order (a check's replay): no day boundary to save at.</summary>
+        public bool PlaysInFixtureOrder => _order == SeasonPlayOrder.FixtureOrdinalForTest;
+
+        /// <summary>★ S127 — a restored walk takes the new run's game and month line (never stored).</summary>
+        public void Rebind(Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play, Action<string, int>? monthDone)
+        {
+            const System.Reflection.BindingFlags f = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(SeasonCalendarRun).GetField(nameof(_play), f)!.SetValue(this, play);
+            typeof(SeasonCalendarRun).GetField(nameof(_monthDone), f)!.SetValue(this, monthDone);
+        }
+
+        /// <summary>★ S127 (K8 step 3) — null when this restored walk is a season between days whose next day is
+        /// <paramref name="nextDay"/>: open, holding <paramref name="totalGames"/> games, every game dated before
+        /// the next day played and no other, every source agreeing, and the season run's own results agreeing
+        /// (<paramref name="runPlayed"/>). Otherwise the first disagreement, in words.</summary>
+        public string? ResumeFault(DateOnly nextDay, int totalGames, Func<int, bool> runPlayed)
+        {
+            if (_finished || _disposed || _faultedOn is not null) return "a walk that is finished, disposed or failed";
+            if (_order != SeasonPlayOrder.Calendar) return "a walk in fixture order";
+            if (_nextDay != nextDay) return "next day " + _nextDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (_total != totalGames || _slots.Length != _total || _played.Length != _total)
+                return Inv($"{_total} games in the walk against {totalGames} in the season");
+            var due = 0;
+            for (var g = 0; g < _total; g++)
+            {
+                var (source, local, date) = _slots[g]!.Value;
+                var shouldHave = date < nextDay;
+                if (shouldHave) due++;
+                if (_played[g] != shouldHave) return Inv($"ordinal {g} ({date:yyyy-MM-dd}) {(_played[g] ? "played" : "unplayed")}");
+                if (source.HasPlayed(local) is { } flag && flag != shouldHave)
+                    return Inv($"{source.Name} game {local} {(flag ? "played" : "unplayed")} against the walk");
+                if (runPlayed(g) != shouldHave) return Inv($"ordinal {g}'s result {(runPlayed(g) ? "present" : "missing")}");
+            }
+            if (_playOrder.Count != due) return Inv($"{_playOrder.Count} games played against {due} dated before the next day");
+            return null;
         }
 
         /// <summary>Owns nothing to release; marks the run dead. Idempotent.</summary>

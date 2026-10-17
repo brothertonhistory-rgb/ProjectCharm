@@ -24,10 +24,11 @@ namespace Charm.History;
 //  depend on what the file is called.
 //
 //  ★ THE CONTRACT (ChatGPT R1 §4). One set of rules, in this file, that B2 extends:
-//    • every path is one of the five kinds, canonical, '/'-separated:
+//    • every path is one of the six kinds (★ S127 the sixth: a mid-season save), canonical, '/'-separated:
 //        events/season-N.json
 //        gamelog/season-N.log | season-N.log.inprogress | season-N.scout
 //        league/league-N.json
+//        progress/season-N-K.snap   (★ S127)
 //      (N a positive decimal with no leading zero; league-0 is the one zero) —
 //      which by construction refuses an absolute path, a `..`, a `\`, the career
 //      file, its `.bak` / `.new` / lock and anything under the orphans folder;
@@ -38,11 +39,40 @@ namespace Charm.History;
 //      rules entry, the rules' days strictly increasing;
 //    • every listed season file names a listed season; `league-0` is listed; a
 //      `league-N` names a listed season;
-//    • `progress` is null (B2 widens it).
+//    • ★ S127 (B2a) — `progress` is null, or a mid-season save (below).
+//
+//  ★ S127 — A SEASON SAVED MID-WAY. `progress` names the season being played, the
+//  first day not yet played, its seed, the save's number K (1, 2, … within the
+//  season), the snapshot holding the season's whole state, the numbers the season
+//  holds (never published: the career's own counters stay where the last close left
+//  them), and the settings hash and build stamp the save was made under. The
+//  snapshot is a SIXTH listed kind, `progress/season-N-K.snap`, listed only when
+//  `progress` names it — exactly one, N the season and K the save; with `progress`
+//  null, no snapshot is listed. Anything else about the block is refused as
+//  `ProgressInvalid`. No version bump: a v4 file with `progress` null is unchanged,
+//  and a build before S127 refuses a non-null one by name.
 //
 //  ★ v1, v2 AND v3 ARE REFUSED BY NAME, NEVER UPGRADED (C-60). v3 is recognised by
 //  its version before anything else is asked of it.
 // ============================================================================
+
+/// <summary>★ S127 — the numbers a season in progress holds: what the career's counters will be
+/// when the season closes. Each is at or above the published counter.</summary>
+public sealed record ProgressHeld(long NextPersonId, long NextSeasonId, long NextGameId);
+
+/// <summary>★ S127 (K3) — a season saved mid-way. <see cref="Season"/> is the season being played
+/// (the career's next season); <see cref="NextDay"/> the first day not yet played (yyyy-MM-dd);
+/// <see cref="Save"/> this season's save number from 1; <see cref="Snapshot"/> the listed path of
+/// the season's whole state.</summary>
+public sealed record ProgressBlock(
+    long Season, string NextDay, long SeasonSeed, long Save, string Snapshot,
+    ProgressHeld Held, string ConfigSha256, string RulesStamp)
+{
+    /// <summary>The listed path a season's K-th save is stored under.</summary>
+    public static string SnapshotPathFor(long season, long save)
+        => "progress/season-" + season.ToString(CultureInfo.InvariantCulture) + "-" +
+           save.ToString(CultureInfo.InvariantCulture) + ".snap";
+}
 
 /// <summary>One file the career owns: its name-free path and its SHA-256.</summary>
 public sealed record ListedFile(string Path, string Sha256);
@@ -65,7 +95,8 @@ public sealed record HistoryStateV4(
     long NextSeasonId,
     long NextGameId,
     IReadOnlyList<ListedFile> Files,
-    IReadOnlyList<SeasonEntry> Seasons)
+    IReadOnlyList<SeasonEntry> Seasons,
+    ProgressBlock? Progress = null)
 {
     public const string FormatTag = "charm-history";
     public const int SchemaVersion = 4;
@@ -181,7 +212,26 @@ internal static class HistorySchemaV4
                 w.WriteEndObject();
             }
             w.WriteEndArray();
-            w.WriteNull("progress");
+            if (s.Progress is not { } p)
+                w.WriteNull("progress");
+            else
+            {
+                // ★ S127 — the block's key order is fixed here (ProgressKeys).
+                w.WriteStartObject("progress");
+                w.WriteNumber("season", p.Season);
+                w.WriteString("nextDay", p.NextDay);
+                w.WriteNumber("seasonSeed", p.SeasonSeed);
+                w.WriteNumber("save", p.Save);
+                w.WriteString("snapshot", p.Snapshot);
+                w.WriteStartObject("held");
+                w.WriteNumber("nextPersonId", p.Held.NextPersonId);
+                w.WriteNumber("nextSeasonId", p.Held.NextSeasonId);
+                w.WriteNumber("nextGameId", p.Held.NextGameId);
+                w.WriteEndObject();
+                w.WriteString("configSha256", p.ConfigSha256);
+                w.WriteString("rulesStamp", p.RulesStamp);
+                w.WriteEndObject();
+            }
             w.WriteEndObject();
         }
         var body = stream.ToArray();
@@ -240,14 +290,45 @@ internal static class HistorySchemaV4
             var files = ParseFiles(root.GetProperty("files"));
             var seasons = ParseSeasons(root.GetProperty("seasons"));
 
-            var progress = root.GetProperty("progress");
-            if (progress.ValueKind != JsonValueKind.Null)
-                throw new HistoryException(HistoryError.ProgressNotNull,
-                    "'progress' must be null — this build saves only at a season's close.");
+            var progress = ParseProgress(root.GetProperty("progress"));
 
-            var state = new HistoryStateV4(historyId, fingerprint, (int)startYear, person, season, game, files, seasons);
+            var state = new HistoryStateV4(historyId, fingerprint, (int)startYear, person, season, game, files, seasons,
+                                           progress);
             ValidateContract(state);
             return state;
+        }
+    }
+
+    private static readonly string[] ProgressKeys =
+        { "season", "nextDay", "seasonSeed", "save", "snapshot", "held", "configSha256", "rulesStamp" };
+    private static readonly string[] HeldKeys = { "nextPersonId", "nextSeasonId", "nextGameId" };
+
+    /// <summary>★ S127 (K3) — null, or a mid-season save's block. Anything malformed about the block —
+    /// a missing, unknown or repeated key, a wrong type — is refused as <see cref="HistoryError.ProgressInvalid"/>;
+    /// how it fits the rest of the file is the contract's.</summary>
+    private static ProgressBlock? ParseProgress(JsonElement el)
+    {
+        if (el.ValueKind == JsonValueKind.Null) return null;
+        try
+        {
+            if (el.ValueKind != JsonValueKind.Object)
+                throw new HistoryException(HistoryError.WrongType, "'progress' must be null or an object.");
+            RejectUnknownOrDuplicateKeys(el, ProgressKeys, "the progress block");
+            var held = el.GetProperty("held");
+            if (held.ValueKind != JsonValueKind.Object)
+                throw new HistoryException(HistoryError.WrongType, "'held' must be an object.");
+            RejectUnknownOrDuplicateKeys(held, HeldKeys, "the progress block's 'held'");
+            return new ProgressBlock(
+                RequireLong(el, "season"), RequireString(el, "nextDay"), RequireLong(el, "seasonSeed"),
+                RequireLong(el, "save"), RequireString(el, "snapshot"),
+                new ProgressHeld(RequireLong(held, "nextPersonId"), RequireLong(held, "nextSeasonId"),
+                                 RequireLong(held, "nextGameId")),
+                RequireString(el, "configSha256"), RequireString(el, "rulesStamp"));
+        }
+        catch (HistoryException hx) when (hx.Error != HistoryError.ProgressInvalid)
+        {
+            throw new HistoryException(HistoryError.ProgressInvalid,
+                $"the career's mid-season save is malformed — {hx.Message}", hx);
         }
     }
 
@@ -319,7 +400,23 @@ internal static class HistorySchemaV4
             ?? Match(path, "gamelog", "season-", ".log.inprogress", "inprogress", false)
             ?? Match(path, "gamelog", "season-", ".log", "log", false)
             ?? Match(path, "gamelog", "season-", ".scout", "scout", false)
-            ?? Match(path, "league", "league-", ".json", "league", true);
+            ?? Match(path, "league", "league-", ".json", "league", true)
+            ?? (SnapshotNumbers(path) is { } sn ? ("snap", sn.Season) : null);
+    }
+
+    /// <summary>★ S127 — the sixth kind, `progress/season-N-K.snap`: N the season, K the save, both
+    /// positive with no leading zero. Null for any other path.</summary>
+    internal static (long Season, long Save)? SnapshotNumbers(string path)
+    {
+        const string head = "progress/season-", tail = ".snap";
+        if (!path.StartsWith(head, StringComparison.Ordinal) || !path.EndsWith(tail, StringComparison.Ordinal)
+            || path.Length <= head.Length + tail.Length) return null;
+        var parts = path[head.Length..^tail.Length].Split('-');
+        if (parts.Length != 2) return null;
+        static long? Positive(string d)
+            => d.Length > 0 && d[0] != '0' && d.All(char.IsAsciiDigit)
+               && long.TryParse(d, NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : null;
+        return Positive(parts[0]) is { } n && Positive(parts[1]) is { } k ? (n, k) : null;
     }
 
     internal static void ValidateContract(HistoryStateV4 s)
@@ -339,7 +436,7 @@ internal static class HistorySchemaV4
             if (c is null)
                 throw new HistoryException(HistoryError.ListedPathInvalid,
                     $"the career lists '{f.Path}', which is not a file a career owns (a season's event record, " +
-                    "log, scouting file, or a league state). The career file, its backup, its lock and anything " +
+                    "log, scouting file, a league state, or ★ S127 a mid-season save). The career file, its backup, its lock and anything " +
                     "set aside are never listed.");
             if (!seen.Add(f.Path))
                 throw new HistoryException(HistoryError.ListedPathDuplicate,
@@ -391,6 +488,7 @@ internal static class HistorySchemaV4
         foreach (var (kind, n, path) in kinds)
         {
             if (kind == "league" && n == 0) { hasLeagueZero = true; continue; }
+            if (kind == "snap") continue;   // ★ S127 — a season in progress; checked against `progress` below
             if (n < 1 || n > played)
                 throw new HistoryException(HistoryError.ManifestMismatch,
                     $"the career lists '{path}', but season {n.ToString(CultureInfo.InvariantCulture)} is not a season it has published.");
@@ -398,6 +496,42 @@ internal static class HistorySchemaV4
         if (!hasLeagueZero)
             throw new HistoryException(HistoryError.ManifestMismatch,
                 "the career does not list league/league-0.json — every career is born with its league state.");
+
+        ValidateProgress(s, kinds.Where(k => k.Kind == "snap").Select(k => k.Path).ToList());
+    }
+
+    /// <summary>★ S127 (K3) — the progress block against the rest of the file, refused as
+    /// <see cref="HistoryError.ProgressInvalid"/>: with no block, no snapshot listed; with one, exactly
+    /// one snapshot, the one it names, for the career's next season, and held numbers that follow on from
+    /// the published ones.</summary>
+    private static void ValidateProgress(HistoryStateV4 s, List<string> snapshots)
+    {
+        static HistoryException Bad(string why) => new(HistoryError.ProgressInvalid,
+            "the career's mid-season save does not fit the career: " + why);
+        static string I(long v) => v.ToString(CultureInfo.InvariantCulture);
+        if (s.Progress is not { } p)
+        {
+            if (snapshots.Count > 0)
+                throw Bad($"it lists '{snapshots[0]}' but holds no season in progress.");
+            return;
+        }
+        if (p.Season != s.NextSeasonId)
+            throw Bad($"it names season {I(p.Season)}, but the career's next season is {I(s.NextSeasonId)}.");
+        if (!IsCanonicalDay(p.NextDay))
+            throw Bad($"its next day '{p.NextDay}' is not a yyyy-MM-dd date.");
+        if (p.Save < 1 || p.Save == long.MaxValue)
+            throw Bad($"its save number {I(p.Save)} is not 1 or more.");
+        if (!string.Equals(p.Snapshot, ProgressBlock.SnapshotPathFor(p.Season, p.Save), StringComparison.Ordinal))
+            throw Bad($"its snapshot '{p.Snapshot}' is not season {I(p.Season)}'s save {I(p.Save)}.");
+        if (snapshots.Count != 1 || !string.Equals(snapshots[0], p.Snapshot, StringComparison.Ordinal))
+            throw Bad($"it names '{p.Snapshot}' but the career lists {(snapshots.Count == 0 ? "no snapshot" : string.Join(", ", snapshots))}.");
+        if (p.Held.NextSeasonId != p.Season + 1)
+            throw Bad($"it holds next season {I(p.Held.NextSeasonId)}; a season in progress holds exactly its own number.");
+        if (p.Held.NextPersonId < s.NextPersonId || p.Held.NextGameId < s.NextGameId
+            || p.Held.NextPersonId == long.MaxValue || p.Held.NextGameId == long.MaxValue)
+            throw Bad("its held numbers fall below the career's published counters or outside their domain.");
+        if (!IsLowerHex64(p.ConfigSha256) || !IsLowerHex64(p.RulesStamp))
+            throw Bad("its settings hash or build stamp is not 64 lowercase hex characters.");
     }
 
     internal static bool IsCanonicalDay(string? s)

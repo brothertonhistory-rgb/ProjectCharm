@@ -10,7 +10,20 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 126** (2026-10-16; verified on Emmett's machine — the full suite, **102 sections, `ALL CHECKS
+Last updated: **Session 127** (2026-10-17; verified on Emmett's machine — the full suite, **103 timed sections,
+1,466.7s, `ALL CHECKS PASSED.`**; Phase 118 new, 29 assertions, 289.3s; the stock season saved through 2027-02-10 by one
+run and resumed by the next printed a page **identical, 1,409 lines**, to the season played straight through).
+**A SEASON SAVED MID-WAY RESUMES EXACTLY** (save design phase **B2a**, C-68; B2 split by Emmett, 2026-10-16, into B2a and
+B2b): `season … --history <career> --through <day>` plays through that day and **saves the season's whole state** — the
+rosters, the schedule, the brackets, every result so far — into the career; the next run with that career picks it up the
+following day and plays on, never re-doing the preseason or replaying a game. A season saved on **any** day finishes
+byte-identical to the same season played straight through: Phase 118 saves fixture-mte season two at the end of every one
+of its 163 days and resumes each, cuts stock through its conference-tournament weeks, and resumes in a fresh program. A
+save made by another build or under other settings is **refused by name** (B2b offers the restart). **Nothing about the
+basketball changed**, and a season nobody saves mid-way writes exactly what it always has. **C-69** — which checks a
+session runs (CONVENTIONS v19). Journal S127 has the detail.)
+
+Previous: **Session 126** (2026-10-16; verified on Emmett's machine — the full suite, **102 sections, `ALL CHECKS
 PASSED.`**; Phase 117 new, 19 assertions; Phases 100 (38, at 102 rows), 112 (39), 115 (20) and 116 (33) as predicted; the
 wall 102–104 green; the season page line for line against S125's but for `History:`). **NOTHING READS WHAT THE CAREER DOES
 NOT LIST** (save design phase **B1c**, C-68 — B1 is finished): every part of the game that reads an old season — the pages,
@@ -653,6 +666,11 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S127 MOVED NOTHING.** Every fingerprint and pin stays where S126 left it (Phases 102–104, Phase 113 C2, Phase 116 C1
+green, unchanged; Phase 80 B10's v4 golden unchanged — a career with no season in progress writes `progress` null exactly
+as before). What is new is a career that holds a season in progress: `progress` set, the snapshot listed. Registry 103.
+The full suite last ran at **S127** (C-69 counts five sessions from here).
+
 **S126 MOVED NOTHING.** Every fingerprint and pin stays where S125 left it (Phases 102–104, Phase 113 C2, Phase 116 C1
 green, unchanged). What changed is what happens to a file a career does not list: no reader reads it, and the open sets it
 aside. Registry 102.
@@ -862,6 +880,19 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S127 — A SEASON SAVED MID-WAY RESUMES EXACTLY (save design B2a, C-68).** `Charm.History`: `ProgressBlock` /
+  `ProgressHeld`; v4's `progress` parsed, written and checked (`ProgressInvalid` replaces `ProgressNotNull`); the sixth listed
+  kind `progress/season-N-K.snap`, listed only when `progress` names it; the store keeps its **published** state apart from
+  the counters it **holds**; `PublishProgress` (the one-swap save, no counters, no season), `ResumeHeld`,
+  `WriteProgressSnapshot`, `ReadProgressSnapshot` (the read door), `HeldCounters`, `EffectiveRules`; `PublishSeason` clears
+  `progress`; quarantine and the listed-path resolver learn `progress/`; errors `ProgressRulesChanged`, `SnapshotMismatch`,
+  `SnapshotMalformed`. Harness: `Program.Season.Snapshot.cs` (the walker — every instance field of the season graph by
+  reflection, ids by reference, allocate → fill → rehash; the frozen person map by its public builder; rebound and refused
+  fields by name and path); `SeasonRun.SaveSnapshot` / `SaveProgress` / `Resume` (the K8 gate) and the fields `seasonSeed`,
+  `advancing`; the walk's `Rebind` and `ResumeFault`; each source's `HasPlayed`; the `season` command's `--through` and
+  resume. Checks: Phase 118 new (29); Phase 116 C3c renamed; Phase 117's sites (`ResolveListed` 3 → 5) and its invariant
+  over `progress/`; `RelistCareerForCheck` lists the named snapshot; Phase 114's inventory (+2, `verbose`'s note);
+  registry 103. Journal S127.
 - **★ S126 — NOTHING READS WHAT THE CAREER DOES NOT LIST (save design B1c, C-68; B1 finished).** `Charm.History`:
   `CareerFileKind`; `HistoryStore.ListedPath(kind, season)` — the one read door; quarantine at every open (the career file
   and a verifying `.bak` protect what they list; files only; one attempt each, a `WARNING:` line for one that cannot move);
@@ -1528,10 +1559,11 @@ chart is PROVISIONAL pending O-6.
   interrupted season no longer ends a career); **B1b** — the career file becomes trustworthy ✅ S125 (v4 with its
   checksum and file list, the backup and recovery, the rules record, the league-state file, older careers refused);
   **B1c** — nothing reads a file the career does not list ✅ S126 (the read door, quarantine at every open, the close's
-  names check; S124's set-aside retired). **B2** — resuming mid-season: **next**, re-scoped to Q1's snapshot design (the
-  brief's B2 section is marked "to be revised"): under Q1 a **snapshot** design (its schema, shared references restored, live source state, resources
-  rebound), with re-play kept as the suite's oracle — a snapshot restored in a fresh process must finish identical to an
-  uninterrupted season; the brief's re-play design of B2 is no longer authoritative. The log **written as games play**
+  names check; S124's set-aside retired). **B2** — resuming mid-season, split by Emmett (2026-10-16): **B2a** — a season
+  saved mid-way resumes exactly ✅ S127 (Q1's snapshot — the season's whole state stored on any day; `progress`; `--through`;
+  re-play kept only as the suite's oracle); **B2b** — **next**: the offer to restart a season saved by another build or
+  under other settings (Q8; B2a refuses by name), and the log written as games are played (Q5; B2a keeps the played games
+  in the snapshot). The log **written as games play**
   (Q5, ruled) is an **uncommitted working file until the season closes** — a file the current save lists is never
   appended to — settled before B1b finalizes its transaction design. **B3** — fresh dice (O-132), autosave (Q2: day,
   week, two weeks or month; weekly by default), the sim commands. **C** — prestige read from the league state.
@@ -1547,6 +1579,10 @@ chart is PROVISIONAL pending O-6.
   decision, not a fix. Not urgent. **S126:** readers do not re-hash on read (agreed at the B1c review — verified at open, the
   lock held for the run), and each open now also reads the backup once and lists three folders: a few milliseconds
   (sandbox: 3.6 ms clean, 4.2 ms setting aside fifty files).
+- **O-138 — SUPERSEDED MID-SEASON SAVES COLLECT IN `career.orphans/` (S127).** No snapshot is ever deleted by the game
+  (K8): a superseded one stays listed by `.bak` for one save, then the next open sets it aside like any unlisted file. A
+  stock save is ~33.5 MB, so autosave (B3, weekly by default) would leave one per week. Clearing them out is **B3's**,
+  with autosave. Not urgent.
 - **O-135 — RECRUITING THROUGH THE YEAR (S122, C-67).** Recruiting happens during many of the year's phases (Emmett, on
   the approved year). After O-133, O-134 and O-126.
 - **O-126 — WEEKLY IN-SEASON PRACTICE (S121; re-sequenced at S122).** Small weekly bumps during the season, on top of the
@@ -2488,6 +2524,22 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-69 (S127, Emmett, 2026-10-17) — WHICH CHECKS A SESSION RUNS; THE FULL SUITE ONLY AT MILESTONES.** *"I just find it
+  hard to believe there are really any tests at all that we have to run that have to hit every single check you've ever
+  built."* The fingerprint wall (Phases 102–104) turns red if a change moves the basketball anywhere, so every session runs
+  its own phases, **every check that reads what changed** (found by search, listed with reasons in the delivery note), the
+  registry and the wall. **The full suite only when** any file under `src/Charm.Engine` changed (mechanical), at a
+  milestone (the end of a design phase, or the fifth session since the last full run, whichever first), or when a targeted
+  run or the wall goes red. Risk accepted: something the wall cannot see surfaces at the next milestone. Supersedes C-57's
+  "a shared change runs the full suite". CONVENTIONS v19 §2. Do not drift back to a full suite every session.
+- **S127 (B2a) — A MID-SEASON SAVE IS TIED TO THE BUILD THAT MADE IT.** The snapshot stores every field of the season by
+  reflection, in a layout only the same build reads; a resume under another build stamp or settings hash is refused
+  (`ProgressRulesChanged`). There is no cross-version snapshot layout and none should be written — C-60, and B2b's restart
+  offer is the answer to a changed build. Debug and Release stamp differently, so a save from one refuses in the other.
+- **S127 (B2a) — C5c, "A TABLE RESTORED IN REVERSE ORDER TURNS THE COMPARISON RED", IS NOT CONSTRUCTIBLE.** Nine tables
+  the season changes during play were each reversed after a restore; nothing the season writes or prints moved (every
+  reader sorts). Order is still guarded: every restored save, saved again, must be byte-identical (Phase 118 C1b). Recorded
+  on the page, never counted as a pass; do not "fix" it by weakening the comparison.
 - **S126 (B1c, agreed at the prompt's review) — A READER DOES NOT RE-HASH THE FILE IT READS.** The store verified every
   listed file when the career opened and the lock is held for the run; an outside program editing a career mid-run is the
   trust boundary S89 draws. Re-hashing would double the reading (O-137). Do not "add" a hash check to the readers.
@@ -2566,7 +2618,7 @@ chart is PROVISIONAL pending O-6.
 - **C-61 (S118.1, Emmett, 2026-10-08) — THE SANDBOX RUNS ONLY WHAT THE SESSION TOUCHED.** *"the last 30ish sessions
   have taken far, far longer than the previous ones. I think it's largely the trial and error you do in the sandbox."*
   Claude compiles, then runs the new check and the checks that read what changed; **never the full suite in the
-  sandbox** — when C-57 calls for one it runs once, on Emmett's machine. **Drafts read the code and never build the
+  sandbox** — when C-69 (was C-57) calls for one it runs once, on Emmett's machine. **Drafts read the code and never build the
   design**; moved pins are captured from the real build, justified by the only-these-games-moved check, old → new in
   the journal. CONVENTIONS v17 §2. Do not reintroduce draft-time throwaway builds or declared-before-the-build pins.
 - **C-60 (S117, Emmett's ruling 6, 2026-10-06) — THE GAME IS THE PRODUCT, NOT ITS SAVE FILES.** *"We are building the
@@ -2589,7 +2641,8 @@ chart is PROVISIONAL pending O-6.
   *CLASS YEAR IS NOT IN THE ARCHIVE (opened S90 chores; half shipped S113 — every pool player has a class, on the pool
   row; the archive did not keep it).*
 - **C-57 (S114, Emmett's ruling, 2026-10-05) — TARGETED CHECKS FOR ISOLATED CHANGES; THE FULL SUITE WHEN THERE IS
-  BLEED-OVER.** *"As long as we are touching something isolated, we should only test that. If there is bleed over
+  BLEED-OVER.** ★ **Superseded by C-69 (S127)** for when the full suite runs; its S116 sharpening (*who reads the thing
+  that changed*) is carried into C-69. *"As long as we are touching something isolated, we should only test that. If there is bleed over
   then we can always revert back to a full run."* A session that adds a self-contained check or touches one subsystem
   runs its own phase plus the fingerprint-wall phases; a session that touches something shared (the draft loop, the
   season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. ★ **Sharpened S116 (Emmett, "yes"):**
@@ -2886,6 +2939,20 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **A SEASON SAVED MID-WAY RESUMES EXACTLY — S127 (2026-10-17). B2a SHIPPED. NEXT: B2b (O-134, C-68)** — the offer to
+restart a season saved by another build or under other settings (Q8; today `SEASON ERROR [ProgressRulesChanged]`), and the
+season log written as games are played (Q5); drafted at the next-prompt pass (CONVENTIONS §6). **Carry into the draft:**
+(1) **The snapshot holds the played games' log blocks** (`logSlots`), so Q5 changes what the snapshot carries, and a log
+written during play must be a file the current save does not list until the close, or a listed file never appended to
+(K8) — decide which, explicitly. (2) **The restart offer throws away a saved season**: what it keeps (the career as of the
+last close) and what it sets aside (the snapshot) must follow the open's quarantine, never a delete. (3) **Fixture-mte
+plays no conference tournaments** (a league needs eight; its leagues have five): any proof about tournament weeks runs on
+stock (Phase 118 C1d, C5b). (4) **Pin no snapshot bytes** — they hold library-math decimals and are tied to the build;
+compare a resumed season against the same season straight through in the same run, as Phase 118 does. (5) The
+superseded-saves item (O-138) is B3's. (6) **C-69**: B2b's paste-back is its own phases, the checks that read `progress` and
+the snapshot (Phases 116, 117, 118), the registry and the wall — the full suite only if the engine changes or the five-session
+count is up.
 
 ★ **NOTHING READS WHAT THE CAREER DOES NOT LIST — S126 (2026-10-16). B1 IS FINISHED. NEXT: B2, RESUMING MID-SEASON
 (O-134, C-68)**, re-scoped to **Q1's snapshot design** — the brief's B2 section is marked "to be revised" and is drafted

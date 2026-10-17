@@ -69,7 +69,7 @@ public enum HistoryError
     /// torn, damaged, or one of the files it lists is missing or changed).</summary>
     BackupUnusable,
     /// <summary>A listed path is not a file a career owns: absolute, `..`, `\`, out of order, or
-    /// outside the five kinds (which also refuses the career file, its backup, its lock and orphans).</summary>
+    /// outside the six kinds (which also refuses the career file, its backup, its lock and orphans).</summary>
     ListedPathInvalid,
     /// <summary>A path is listed twice.</summary>
     ListedPathDuplicate,
@@ -81,8 +81,10 @@ public enum HistoryError
     /// <summary>The list and the seasons disagree: a season file for an unpublished season, or no
     /// `league-0`.</summary>
     ManifestMismatch,
-    /// <summary>`progress` is not null — this build saves only at a season's close.</summary>
-    ProgressNotNull,
+    /// <summary>★ S127 — the mid-season save block is malformed, or does not fit the career: a snapshot
+    /// listed with no block, a block naming another season or snapshot, held numbers below the published
+    /// ones. (Replaces S125's `ProgressNotNull`, from when a save existed only at a season's close.)</summary>
+    ProgressInvalid,
     /// <summary>A league state file is malformed, belongs to another career or another season.</summary>
     LeagueStateInvalid,
     /// <summary>The league state disagrees with the world's prestige (the B1 equality assertion).</summary>
@@ -90,6 +92,18 @@ public enum HistoryError
     /// <summary>A save would write a file under a name the career already lists (K8: a listed file
     /// is never written to, renamed or deleted by the game).</summary>
     ListedNameTaken,
+
+    // ── ★ S127 (B2a) — a season saved mid-way. ──
+
+    /// <summary>The career holds a season saved mid-way under another build or other settings; B2a
+    /// refuses to resume it (B2b offers to restart the season).</summary>
+    ProgressRulesChanged,
+    /// <summary>A mid-season save disagrees with the career file that lists it: its header, or the
+    /// season it restores to (the season, the seed, the next day, the held numbers, the games played).</summary>
+    SnapshotMismatch,
+    /// <summary>A mid-season save hashes as listed but cannot be decoded: truncated, a dangling
+    /// reference, an unknown type, a length past its end, bytes after its end.</summary>
+    SnapshotMalformed,
 }
 
 /// <summary>Every history failure, carrying its classification. Tests assert

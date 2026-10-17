@@ -15,6 +15,10 @@ code claim below was opened at draft time. Nothing was built.
 > autosave is a **setting** (every day, week, two weeks or month; **weekly** by default); Q5 — the season log **is**
 > written as games are played. The others were ruled as recommended. **Where this brief says otherwise, C-68 governs.**
 > B2 (§7) is marked for revision; that revision is the B2 draft's job, not a rewrite of this brief.
+>
+> **★ After S127 (2026-10-17).** **B2 was split by Emmett (2026-10-16) into B2a and B2b. B2a shipped in S127** (Phase 118;
+> §14l): Q1's snapshot — the season's whole state stored on any day, resumed in a fresh program byte-identical to an
+> uninterrupted season. **B2b is next:** the restart offer (Q8, §4d, §14b) and the log written as games are played (Q5).
 
 ---
 
@@ -586,11 +590,13 @@ unlisted file.
 
 ### Phase B2 — a season resumes on the day it stopped (fixed dice)
 
-> **★ TO BE REVISED FOR Q1 (C-68).** This section, and the re-play loading it rests on (§2b's `progress` block, §2e,
-> §3, §4c step 4), describe r3's design. Q1 ruled **store everything**: B2 is redesigned around a **snapshot** — its
-> schema, shared references restored (`resultSlots` is one list the tournaments share), live source state, resources
-> rebound — **with re-play kept as the suite's oracle**: a snapshot restored in a fresh process must finish identical to
-> an uninterrupted season. The starting point is Phase 114's state inventory (§14h). The revision is the B2 draft's job.
+> **★ SUPERSEDED BY THE S127 BUILD (B2a; §14l) — kept below as r3's design, for the record.** Q1 ruled **store
+> everything**, and B2 was split (Emmett, 2026-10-16): **B2a** (S127) built the **snapshot** — the season's object graph
+> stored whole, shared references restored, resources rebound, the career file's `progress` block naming it — with re-play
+> kept only as the suite's oracle; there is no re-play loading, no integrity fingerprint over a re-played season, and the
+> command is `season … --through`, not `advance`. **B2b** builds what remains of this section: the mid-season rules check's
+> **restart offer** (§4d, §14b; B2a refuses by name) and the log written as games are played (Q5). The proof is Phase 118,
+> not 116.
 
 *High risk.*
 
@@ -1128,3 +1134,34 @@ keeps readers off the path builders and the re-list helper inside the checks.
 not one of the five recognised kinds, or be set aside at every open by design; the choice is B2's, made explicitly. (2) A
 new reader asks `ListedPath`; one that builds a path moves Phase 117 C3's counted table. (3) A career-file pin stays a
 portable digest (§14j).
+
+### 14l. After S127 — what B2a delivered
+
+**B2a shipped (S127, verified on Emmett's machine — the full suite, 103 sections, `ALL CHECKS PASSED.`, and the stock season
+saved through 2027-02-10 by one run and resumed by the next printed a page identical, 1,409 lines, to the season played
+straight through; journal S127, design "A season saved mid-way").** `season <world> <seed> --history <career> --through
+<day>` plays through that day and saves the season's whole state; the next run with that career resumes the following day.
+**The snapshot** is the `SeasonRun`'s object graph stored by reflection — ids by reference, structs inline, doubles as raw
+bits — and restored in three stages (allocate, fill, rehash last); its format is tied to the build. **The career file's
+`progress`** (v4, no version bump) names the season, the next day, the seed, the save number, the listed snapshot
+(`progress/season-N-K.snap`, the sixth listed kind), the held numbers and the rules; a progress save publishes no counters
+and no season, and the close clears it. **The integrity gate (K8)** checks the rules and the header before decoding, decodes
+with bounds, and checks the restored season against `progress` before anything plays. Refused by name: another seed, another
+build or settings (`ProgressRulesChanged`), a malformed or mismatched save (`SnapshotMalformed`, `SnapshotMismatch`),
+`--through` with no career or before the next day, a save while a day or the close is being played. **Proof: Phase 118** —
+fixture-mte season two saved at every one of its 163 days and resumed identical; stock cut through its conference-tournament
+weeks; fresh-program resumes at the days that stress state, chained; negative controls.
+
+**Found at the gate, and how each was settled.** (1) **Fixture-mte plays no conference tournaments** (a league needs eight
+teams; its leagues have five), so the tournament weeks and the shared-results-list control run on stock. (2) A resumed
+career's backup is, correctly, its mid-season save, and its snapshot stays on disk, so the fresh-program comparison is the
+career file and every file it lists, not the whole folder. (3) The inventory gained the save's two lifecycle fields; Phase
+117's quarantine invariant covers the new folder. (4) The person map is a frozen dictionary, added to the walker
+deliberately. (5) Four read-only static tables are shared by the season graph; restored, they become private copies, and
+nothing writes or compares them by identity during play or the close. (6) The store keeps its published state apart from the
+counters it holds, so a progress save never publishes held numbers.
+
+**What it hands B2b.** (1) The snapshot carries the played games' log blocks; Q5's log written during play changes that, and
+must respect K8 (a listed file is never appended to). (2) The restart offer discards a saved season — through the open's
+quarantine, never a delete. (3) Superseded saves collect in `career.orphans/` (O-138, B3's). (4) Pin no snapshot bytes:
+compare a resumed season with the same season straight through in the same run.

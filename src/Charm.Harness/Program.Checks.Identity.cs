@@ -670,6 +670,14 @@ internal static partial class Program
         var node = System.Text.Json.Nodes.JsonNode.Parse(bytes.AsSpan(0, bytes.Length - 72))!.AsObject();
         var nextSeason = (long)node["nextSeasonId"]!;
         var onDisk = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        //  ★ S127 — a career holding a season in progress: the snapshot its `progress` names is listed at its
+        //    current bytes (so a check can plant a save that hashes right and is wrong inside, Phase 118 C7).
+        if (node["progress"] is System.Text.Json.Nodes.JsonObject progress
+            && progress["snapshot"]?.GetValue<string>() is { } snap && RelistSnapshotOf(snap) is not null)
+        {
+            var file = HistoryStore.ResolveListed(careerPath, snap);
+            if (File.Exists(file)) onDisk[snap] = HistoryStore.HashFile(file);
+        }
         foreach (var kind in new[] { "events", "gamelog", "league" })
         {
             var folder = HistoryStore.SiblingFolderFor(careerPath, kind);
@@ -686,6 +694,16 @@ internal static partial class Program
         node["files"] = files;
         var text = node.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }).Replace("\r\n", "\n") + "\n";
         File.WriteAllBytes(careerPath, SealCareer(text));
+    }
+
+    /// <summary>★ S127 — the (season, save) of a mid-season save's listed name, `progress/season-N-K.snap`
+    /// (canonical numbers, both positive), or null. The suite's own reading of the sixth kind.</summary>
+    private static (long Season, long Save)? RelistSnapshotOf(string listed)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(listed, @"^progress/season-([1-9][0-9]*)-([1-9][0-9]*)\.snap$");
+        return m.Success
+            ? (long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture), long.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture))
+            : null;
     }
 
     /// <summary>The season of a name a save lists (the four kinds a close writes), or null. Canonical

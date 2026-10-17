@@ -544,6 +544,8 @@ internal static partial class Program
             _played[local] = true;
         }
 
+        public override bool? HasPlayed(int local) => _played[local];
+
         public override void AssertComplete()
         {
             if (_played.Any(p => !p) || _champion == 0)

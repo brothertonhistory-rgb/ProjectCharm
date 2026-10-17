@@ -474,7 +474,8 @@ internal static partial class Program
                     ("seasons out of order", o => { var s = o["seasons"]!.AsArray(); var first = s[0]!.DeepClone(); s.RemoveAt(0); s.Add(first); }, HistoryError.SeasonsInvalid),
                     ("league-0 removed", o => { var f = Files(o); f.RemoveAt(f.Select((x, i) => (x, i)).First(t => (string)t.x!["path"]! == "league/league-0.json").i); }, HistoryError.ManifestMismatch),
                     ("a bad hash string", o => Files(o)[0]!["sha256"] = ((string)Files(o)[0]!["sha256"]!).ToUpperInvariant(), HistoryError.ListedHashInvalid),
-                    ("progress not null", o => o["progress"] = new JsonObject(), HistoryError.ProgressNotNull),
+                    // ★ S127 — `progress` may now hold a mid-season save; an empty block is a malformed one.
+                    ("a progress block missing its keys", o => o["progress"] = new JsonObject(), HistoryError.ProgressInvalid),
                 };
                 foreach (var (label, edit, want) in cases)
                 {

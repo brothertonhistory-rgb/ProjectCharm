@@ -63,7 +63,7 @@ internal static partial class Program
         ("GameLogWriter.cs", "LogFolderFor(", 3),
         ("HistoryStore.cs", "LeagueStateFile.PathFor(", 2),            // creation and the league writer
         ("HistoryStore.cs", "LeagueStateFile.FolderFor(", 1),
-        ("HistoryStore.cs", "ResolveListed(", 3),
+        ("HistoryStore.cs", "ResolveListed(", 5),                      // ★ S127 +2: the mid-season save's writer and its read door
         ("HistoryStore.cs", "SiblingFolderFor(", 5),
         ("HistoryStore.cs", "Directory.GetFiles(", 1),                 // quarantine
         ("LeagueStateFile.cs", " PathFor(", 1),
@@ -204,7 +204,8 @@ internal static partial class Program
             static bool Recognised(string listed)
                 => RelistSeasonOf(listed) is not null
                    || (listed.EndsWith(".log.inprogress", StringComparison.Ordinal)
-                       && RelistSeasonOf(listed[..^".inprogress".Length]) is not null);
+                       && RelistSeasonOf(listed[..^".inprogress".Length]) is not null)
+                   || RelistSnapshotOf(listed) is not null;   // ★ S127 — the sixth kind, a mid-season save
             //  ★ THE K2 INVARIANT: every recognised file left in the three folders is listed by a protecting
             //    manifest or named in a warning. Null when it holds.
             string? InvariantFault(string name, IEnumerable<string> report)
@@ -213,7 +214,7 @@ internal static partial class Program
                 foreach (var l in ListIn(CareerOf(name) + ".bak") ?? new HashSet<string>()) protectedNames.Add(l);
                 var warned = report.Where(l => l.StartsWith("WARNING: could not set aside '", StringComparison.Ordinal))
                                    .Select(l => l["WARNING: could not set aside '".Length..].Split('\'')[0]).ToHashSet();
-                foreach (var kind in new[] { "events", "gamelog", "league" })
+                foreach (var kind in new[] { "events", "gamelog", "league", "progress" })   // ★ S127 the saves folder too
                 {
                     var folder = HistoryStore.SiblingFolderFor(CareerOf(name), kind);
                     if (!Directory.Exists(folder)) continue;

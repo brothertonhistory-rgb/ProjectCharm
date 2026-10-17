@@ -9155,18 +9155,27 @@ hand-written at S125, computed outside the C# writer).
   the season's first legal day, the SHA-256 of `config.json` as read, and the build stamp (SHA-256 over the on-disk bytes
   of `Charm.Engine`, `Charm.History` and `Charm.Harness`). **A build-identity record, not a compatibility proof** — any
   rebuild that moves a byte changes the stamp, and an equal stamp says nothing about worlds or settings; Debug and Release
-  stamp differently. Nothing reads it yet; B2's "a different build refuses a mid-season save" (Q8) will.
-- **`progress` (S125).** Reserved, always `null`: B2 fills it without a format change. Anything else is refused.
+  stamp differently. Nothing reads it; a mid-season save records its own copy in `progress` (S127).
+- **`progress` (S125; S127, B2a).** `null` at a close; **a season saved mid-way** otherwise — `{ season, nextDay,
+  seasonSeed, save, snapshot, held: { nextPersonId, nextSeasonId, nextGameId }, configSha256, rulesStamp }`, keys in that
+  order: the season being played (the career's next), the first day not yet played, its seed, the save number K from 1,
+  the listed snapshot `progress/season-N-K.snap`, the numbers the season holds (the career's own counters stay where the
+  last close left them), and the settings hash and build stamp the save was made under. No version bump: a v4 file with
+  `progress` null is byte-identical to S125's, and a build before S127 refuses a non-null one by name. See "A season saved
+  mid-way".
 - **The trailer** proves the bytes are what the writer wrote. A file without one, or whose hash does not match, is
   **torn** (`Torn`) — half-written or edited by hand — and is never half-read: it is recovered from the backup when the
   backup is whole, and refused by name otherwise.
 - **The contract** proves the bytes make sense: one set of rules, `HistorySchemaV4.ValidateContract`, each refusal with its
-  own error. Every path one of the five kinds, canonical, `/`-separated — which by construction refuses an absolute path,
+  own error. Every path one of the six kinds (★ S127 the sixth, `progress/season-N-K.snap`), canonical, `/`-separated — which by construction refuses an absolute path,
   a `..`, a `\`, the career file, its backup, its lock and anything set aside (`ListedPathInvalid`); no path twice,
   compared ignoring case (`ListedPathDuplicate`); every hash 64 lowercase hex (`ListedHashInvalid`); `seasons` exactly 1
   through the last published, each with at least one rules entry, days well-formed and increasing (`SeasonsInvalid`);
-  every listed file naming a published season, and `league-0` always listed (`ManifestMismatch`); `progress` null
-  (`ProgressNotNull`). B2 extends it.
+  every listed file naming a published season, and `league-0` always listed (`ManifestMismatch`); ★ S127 — `progress`
+  null with no snapshot listed, or a block naming the career's next season, a canonical next day, a save number from 1,
+  exactly one listed snapshot — the one it names — held numbers at or above the published ones with the season's own
+  number held, and 64-hex rules (`ProgressInvalid`, which replaces S125's `ProgressNotNull`; a malformed block, `{}`
+  included, is refused the same way).
 - **A history created today is born v4.** No older version is ever written at any instant.
 - **v1 (pre-S90), v2 (S90–S118) and v3 (S119–S124) files are refused by name, never upgraded** (C-60; v3 at S125):
   *"this career was saved by an older version of the game — start a new career"*, classified `UnsupportedVersion`. The
@@ -9886,7 +9895,7 @@ Canonical form is specified once, in `HistorySchemaV2.Serialize`, and pinned by 
 
 `Next*` means **next unissued**: every value below it is permanently unavailable, and the stored value itself has not been handed out yet.
 
-**The loader is as strict as the world loader**, and a save file deserves it more: a misread world produces a wrong league, a misread history produces two men with one number. Every refusal is classified by a `HistoryError` code (tests assert the code, never the message text): `MalformedJson`, `MissingKey`, `DuplicateKey`, `UnknownKey`, `WrongFormat`, `WrongType`, `UnsupportedVersion`, `CounterOutOfDomain`, `FingerprintMismatch`, `PathIsDirectory`, `LockUnavailable`, `PersistFailed`, `NegativeCount`, `ExhaustedRange`, `InvalidIdentity`, `MissingIdentity` — and since S125 the career file's own: `Torn`, `ListedFileMissing`, `ListedFileChanged`, `BackupUnusable`, `ListedPathInvalid`, `ListedPathDuplicate`, `ListedHashInvalid`, `SeasonsInvalid`, `ManifestMismatch`, `ProgressNotNull`, `LeagueStateInvalid`, `LeagueStateMismatch`, `ListedNameTaken` (see "The career file is trustworthy"). **A parse failure is NEVER treated as "no file"** — starting fresh at 1 on top of a corrupt-but-real history reissues every number in it.
+**The loader is as strict as the world loader**, and a save file deserves it more: a misread world produces a wrong league, a misread history produces two men with one number. Every refusal is classified by a `HistoryError` code (tests assert the code, never the message text): `MalformedJson`, `MissingKey`, `DuplicateKey`, `UnknownKey`, `WrongFormat`, `WrongType`, `UnsupportedVersion`, `CounterOutOfDomain`, `FingerprintMismatch`, `PathIsDirectory`, `LockUnavailable`, `PersistFailed`, `NegativeCount`, `ExhaustedRange`, `InvalidIdentity`, `MissingIdentity` — and since S125 the career file's own: `Torn`, `ListedFileMissing`, `ListedFileChanged`, `BackupUnusable`, `ListedPathInvalid`, `ListedPathDuplicate`, `ListedHashInvalid`, `SeasonsInvalid`, `ManifestMismatch`, `ProgressInvalid` (S127; was `ProgressNotNull`), `LeagueStateInvalid`, `LeagueStateMismatch`, `ListedNameTaken` (see "The career file is trustworthy") — and since S127 a mid-season save's: `ProgressRulesChanged`, `SnapshotMismatch`, `SnapshotMalformed` (see "A season saved mid-way"). **A parse failure is NEVER treated as "no file"** — starting fresh at 1 on top of a corrupt-but-real history reissues every number in it.
 
 ### The allocator — high-water, never a free list
 
@@ -12731,7 +12740,7 @@ three-camp career a man is funded in 5–8 distinct attributes. Shooter with ver
 Outside 52 → 64 / 72 / 82 (10th / 50th / 90th); a monster athlete's low-potential finishing 40 → 44 / 46 / 59 when
 you fund it, 38 / 39 / 40 when the computer chases his athleticism instead.
 
-## The season on the calendar (Sessions 122–124, 2026-10-10/12)
+## The season on the calendar (Sessions 122–127, 2026-10-10/17)
 
 ★ **C-67 — the calendar runs the game** (Emmett: *"in general a calendar needs to be the background organization
 that runs the whole game. It should be July 8, 1987 or whatever and offseason recruiting, or whatever ends up going
@@ -12740,7 +12749,9 @@ on then, is happening."*). The arc in three steps: (1) the season played on the 
 buttons (O-133, O-134); (3) weekly practice (O-126), then recruiting through the year (O-135). Step 2's save work runs
 in five phases (★ **C-68**): A, the season that can stop (S123, below); B1, safe saves — split by Emmett (2026-10-12)
 into B1a, nothing written until the season closes (S124, below), B1b, the career file becomes trustworthy (S125), and
-B1c, nothing reads a file the career does not list (S126); B2, resuming mid-season; B3, fresh dice, autosave and the sim commands;
+B1c, nothing reads a file the career does not list (S126); B2, resuming mid-season — split by Emmett (2026-10-16) into
+B2a, a season saved mid-way resumes exactly (S127, below), and B2b, the restart offer and the log written as games play;
+B3, fresh dice, autosave and the sim commands;
 C, prestige read from the league state.
 
 ### One day at a time
@@ -12968,6 +12979,11 @@ backup**, and a torn career file is recovered from that backup. Mid-season savin
   stopped at any step leaves "no career file, a whole backup", and the next open runs the same recovery. Afterwards the
   career file and the backup are identical; the next save makes a new backup. The open reports it, and the `season`
   command and the pages print it. `.new` is never authoritative — overwritten before use, ignored on load.
+- **A progress save (S127, B2a)** — `PublishProgress(snapshotPath, block)`, the same one swap as a save: the snapshot is
+  already written under a new name, and the store lists it in place of the season's previous snapshot and sets `progress`
+  — publishing **no counters and no season**. The store therefore keeps two states: what it last **published** (what a
+  progress save writes) and the counters it **holds** in memory. The close's save then clears `progress` and unlists the
+  snapshot. See "A season saved mid-way".
 
 ★ **Loading.** A career file that verifies — trailer, contract, every listed file's hash — loads, and opening it writes
 nothing. Missing or torn, with a backup that verifies whole: recovered, and said so. Missing or torn, with a backup that is
@@ -13091,6 +13107,87 @@ the files after it moved; a directory at the season's record name — the close 
 written. **Page-only:** what each case set aside; the open's time clean and with fifty unlisted files. Phase 88 C9 splits
 the same way: a record for the pending season planted before the open is set aside by it and the season publishes its
 real record (C9a–c); planted after the open, the close refuses by name (C9d).
+
+### A season saved mid-way (S127 — save design, phase B2a)
+
+★ **What it buys.** Until S127 a season could only be saved when it closed; stopped in March, the next run played it
+again from November 1. Now `season <world> <seed> --history <career> --through <yyyy-MM-dd>` plays through that day and
+**saves the season's whole state** into the career, and the next run with that career picks it up the following day and
+plays on — never re-doing the preseason (rosters, schedule, brackets, contracts) and never replaying a game. **Q1, store
+everything** (C-68): a load is fast because nothing is rebuilt. A season saved on any day finishes **byte-identical** to
+the same season played straight through — every game, the career file, every file it lists, and the close's page.
+**Nothing about the basketball changed, and a season nobody saves mid-way writes exactly what it always has.**
+
+★ **The snapshot** (`Program.Season.Snapshot.cs`). The season is one object graph rooted at its `SeasonRun`; the snapshot
+is that graph, stored **by reflection over every instance field of everything reachable** — private fields and base
+types' too, each level's fields in metadata order. **The format is tied to the build** (the save records the build stamp
+and a resume under another is refused), so a field added to any season type is stored by the next build with no format
+work, and no cross-version layout exists to maintain (C-60). Every reference object gets an id the first time it is met
+and is written once — **identity by reference, never by `Equals`**, so a shared object stays one (the results list every
+conference tournament reads; a man in the pool and on a roster) and two equal-looking objects stay two; strings are
+values; structs, tuples and nullables are written inline; doubles and floats as raw bits. **Restoring runs in three stages
+before anything plays:** allocate every object empty (no constructor runs), fill every field through the id table, then —
+**last, because a key's hash comes from its own fields** — fill each `Dictionary` and `HashSet` in saved order. Only public
+collection behaviour is used (constructor, comparer, `Add` in order). Stored: the value types, the classes, records and
+structs of the three assemblies, arrays of any rank, `List`, `Dictionary` and `HashSet` with the default, `Ordinal` or
+`OrdinalIgnoreCase` comparer, and — added deliberately at the S127 gate — the **frozen person map**
+(`FrozenDictionary` of pure values, stored as its entries in its own order and rebuilt by its public builder).
+**Rebound, never stored:** the caller's career store, world, settings path, verbosity and close seam, and the walk's two
+callbacks (the game and the month line). **Refused by name and field path:** any other delegate, anything reachable from
+the world, a boxed value, any other System type or collection. A stock save on the morning the conference tournaments open
+is **~33.5 MB, ~258,000 objects, saved in ~0.5s and loaded in ~0.4s** on Emmett's machine.
+
+★ **When a save is legal.** Only at a completed day boundary — between two advances. `SaveSnapshot` refuses, by name,
+while a day or the close is being played (a flag held across `AdvanceThrough` and `Finish`, so a month-line or close-step
+callback cannot save), after a fault, after the close, in fixture order (a check's replay) and on a run bound to no career.
+`SaveProgress` writes the snapshot under the season's next save name and publishes it as `progress`; save K+1 lists its
+own snapshot in place of save K's, which stays on disk (K8) — listed by `.bak` for one save, then set aside by the next
+open; superseded saves collect in `career.orphans/` until B3 (O-138).
+
+★ **Resuming (K8, the integrity gate).** A listed hash proves the snapshot is the file the game wrote, not that the game
+wrote it right, so `SeasonRun.Resume` checks, refusing by name with nothing played and the career untouched: (1) the build
+and settings this run plays under against the save's (`ProgressRulesChanged` — B2b will turn it into an offer to restart),
+then the header against `progress` before the body is decoded — build stamp, settings hash, career id, season, next day,
+seed, held numbers (`SnapshotMismatch`, naming the field); (2) bounded decoding — every id inside the table, every type
+one this build has and the walker allows, every length within the bytes left, nothing after the end
+(`SnapshotMalformed`, naming the byte); (3) the restored season against `progress` — its season and seed, between days,
+its walk at the next day with exactly the games dated before it played, every source's played flags and every result
+agreeing (`SnapshotMismatch`). Only then are the caller's resources rebound and the store handed back exactly the numbers
+the season held (`ResumeHeld`).
+
+★ **The command.** A career with no `progress`: as before; with `--through` before the last day it plays through that
+day, saves and prints `Saved: season N through <day> (save K).`; `--through` on or after the last day plays and closes. A
+career with `progress` **resumes**: `Resuming season N on <day> (save K).`, no preflight, no banner, no set-up; it plays on
+through `--through` (another save) or to the close. Refused by name, nothing played: a resume under another seed (naming
+both), under another build or settings, `--through` with no career, `--through` before the next day. The page after a
+resume is the close's page, identical to an uninterrupted season's from its first line (`History:` aside). Pages opened
+on a career holding a saved season read only its published seasons and leave `progress` as it was.
+
+### How Phase 118 proves it
+
+No new pin: every comparison is against the same season played straight through in the same run, in-process seasons
+under the fixed history id and the **real** rules so a child program's career compares byte for byte. **C1** — fixture-mte
+season two saved to its career at the end of **every one of its 163 days** (October 31 to the last) by the run that keeps
+playing; each save copied out and resumed to the close is identical, each restored save saved again is byte-identical to
+itself, and the run that saved every day finishes identical too. **Fixture-mte plays no conference tournaments** (a
+league needs eight teams; its leagues have five), so the tournament weeks are cut on stock: mid-February, the day before
+they open, the day they open, mid-tournament, their last day — each identical. **C2** — the `season` command in a fresh
+program, saved with `--through` and resumed by a second, at six fixture-mte days (before the first game, after the first
+day, mid-bracket, Christmas, mid-February, after the last game), chained (four saves in four programs, then the close),
+and on stock (mid-February, mid-tournament): the career file, every file it lists and the page identical, nothing unlisted
+outside the saves and set-aside folders (the backup is, correctly, the mid-season save). **C3** — on disk: the block, the
+snapshot listed by hash, the published counters unmoved, no season file written; save 2 under a new name with save 1 kept
+and listed by the backup; after the close `progress` null; one byte changed in a snapshot refuses the open
+(`ListedFileChanged`). **C4** — the refusals (seed, settings, build stamp, `--through` with no career, before the next day)
+and a page on a saved career. **C5** — negative controls: one bracket's occupancy dropped, and the shared results list
+restored as a copy (stock), each turn the comparison red; a control whose own sabotage throws counts as broken, never as
+red; **a table restored in reverse order is not constructible** (nine reversed, nothing the season prints moved — every
+reader sorts; recorded on the page, and order is guarded by C1b instead); the walker refuses a planted world school and a
+planted delegate by path. **C6** — page-only: the stock March save's size and times, and every type met. **C7** — six saves
+that hash right but are wrong inside (truncated, a dangling reference, an unknown type, a length past the end, a header
+next day and a restored next day that disagree), each refused by its own name with the career untouched; control, a
+sound save re-listed the same way resumes. **C8** — saves from inside a day, inside the close, after a fault and after the
+close, each refused by name with nothing written.
 
 ### How Phase 113 proves it
 

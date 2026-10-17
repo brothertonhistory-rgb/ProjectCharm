@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Charm.Engine;
 using Charm.History;
 
@@ -105,6 +106,7 @@ internal static partial class Program
         private readonly GenEngineConfigs cfgs;
         private readonly int roadShave;
         private readonly int baseSeed;
+        private readonly long seasonSeed;                                 // ★ S127 — the seed as given; a save records it
 
         // ── Derived values (recompute only where equivalence is proven) ─────────────
         private readonly string fingerprint;
@@ -149,11 +151,13 @@ internal static partial class Program
         private bool finished;
         private bool disposed;
         private string? faultedOn;
+        private bool advancing;                                           // ★ S127 (K2) — a day or the close is running; no save
 
         public SeasonRun(WorldFile world, long seasonSeed, string engineConfigPath, bool verbose, SeasonRunOptions options)
         {
             //  The options, under the parameter names the set-up has always read.
             history = options.History;
+            this.seasonSeed = seasonSeed;
             this.verbose = verbose;
             this.world = world;
             this.engineConfigPath = engineConfigPath;
@@ -503,10 +507,12 @@ internal static partial class Program
             calendar = new SeasonCalendarRun(
                 sources, seasonYearOfRun, options.PlayOrderForTest ?? SeasonPlayOrder.Calendar,
                 PlayOneGame,
-                verbose
-                    ? (month, n) => Console.WriteLine(FormattableString.Invariant($"  ... {month}: {n:N0} games"))
-                    : null);
+                SeasonMonthLine(verbose));
         }
+
+        /// <summary>★ S127 — the page's month line, one definition for a new season and a resumed one.</summary>
+        private static Action<string, int>? SeasonMonthLine(bool verbose)
+            => verbose ? (month, n) => Console.WriteLine(FormattableString.Invariant($"  ... {month}: {n:N0} games")) : null;
 
         public DateOnly FirstLegalDay => calendar.FirstLegalDay;
         public DateOnly LastLegalDay => calendar.LastLegalDay;
@@ -534,6 +540,7 @@ internal static partial class Program
         public void AdvanceThrough(DateOnly day)
         {
             RefuseIfDeadOrFaulted(nameof(AdvanceThrough));
+            advancing = true;
             try
             {
                 calendar.AdvanceThrough(day);
@@ -543,6 +550,10 @@ internal static partial class Program
                 //  A precondition refusal leaves the calendar unfaulted, and so the run.
                 if (calendar.FaultedOn is { } on) faultedOn = on;
                 throw;
+            }
+            finally
+            {
+                advancing = false;
             }
         }
 
@@ -708,6 +719,7 @@ internal static partial class Program
                 throw new InvalidOperationException(FormattableString.Invariant(
                     $"SEASON RUN: Finish before the season is complete; it has played through {calendar.NextDay.AddDays(-1):yyyy-MM-dd} ") +
                     FormattableString.Invariant($"and its last day is {calendar.LastLegalDay:yyyy-MM-dd}."));
+            advancing = true;
             try
             {
                 var outcome = Close();
@@ -719,6 +731,10 @@ internal static partial class Program
                 faultedOn ??= calendar.FaultedOn
                     ?? "its close, after " + calendar.LastLegalDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 throw;
+            }
+            finally
+            {
+                advancing = false;
             }
         }
 
@@ -902,6 +918,119 @@ internal static partial class Program
             Step("counters");
             store.PublishSeason(written, CareerRulesFor(firstLegalDay, engineConfigPath));
             Step("published");
+        }
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        //  ★ S127 (B2a) — A SEASON SAVED MID-WAY.
+        //
+        //  SaveSnapshot — the season's whole state as bytes (Program.Season.Snapshot.cs). Legal only
+        //    at a completed day boundary: between two advances, never while a day or the close runs
+        //    (`advancing`), never on a run that is finished, faulted, disposed, in fixture order, or
+        //    bound to no career. A refused save builds nothing.
+        //  SaveProgress — SaveSnapshot, written under the season's next save name and published as the
+        //    career's `progress` (the career's counters untouched; the held ones in the block).
+        //  Resume — the run built back from a career's saved season, checked (K8) before it is handed
+        //    to anyone: the rules, the header against `progress`, the decoding, and the restored season
+        //    against `progress`. Only then does the store take back the held numbers.
+        // ══════════════════════════════════════════════════════════════════════════════
+
+        private void RefuseSave(string why)
+            => throw new InvalidOperationException("SEASON RUN: SaveSnapshot refused — " + why);
+
+        /// <summary>The header a save made now carries.</summary>
+        private SeasonSnapshotHeader SnapshotHeaderNow()
+        {
+            var rules = HistoryStore.EffectiveRules(CareerRulesFor(calendar.NextDay, engineConfigPath));
+            return new SeasonSnapshotHeader(
+                rules.RulesStamp, rules.ConfigSha256, history!.HistoryId, pendingSeasonId,
+                calendar.NextDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), seasonSeed, history.HeldCounters);
+        }
+
+        public byte[] SaveSnapshot() => SaveSnapshot(out _);
+
+        private byte[] SaveSnapshot(out SeasonSnapshotHeader header)
+        {
+            if (disposed) RefuseSave("the season run has been disposed.");
+            if (faultedOn is not null) RefuseSave($"this season run failed on {faultedOn}.");
+            if (advancing) RefuseSave("a day or the season's close is being played; a save is made only between days.");
+            if (finished) RefuseSave("the season has closed; it is saved by its close.");
+            if (calendar.PlaysInFixtureOrder) RefuseSave("the season is played in fixture order (a check's replay), which has no days to stop between.");
+            if (history is null) RefuseSave("the season is bound to no career; there is nowhere to resume it from.");
+            header = SnapshotHeaderNow();
+            return SeasonSnapshot.Write(header, this, SeasonSnapshot.IsRebound, SeasonSnapshot.Reachable(world));
+        }
+
+        /// <summary>The season saved to its career: the snapshot written under its new name, then the career file
+        /// swapped in with `progress` naming it. Returns the block published.</summary>
+        public ProgressBlock SaveProgress()
+        {
+            var bytes = SaveSnapshot(out var h);
+            var save = (history!.Progress?.Save ?? 0) + 1;
+            var path = history.WriteProgressSnapshot(pendingSeasonId, save, bytes);
+            var block = new ProgressBlock(h.Season, h.NextDay, h.SeasonSeed, save,
+                                          ProgressBlock.SnapshotPathFor(h.Season, save), h.Held, h.ConfigSha256, h.RulesStamp);
+            history.PublishProgress(path, block);
+            return history.Progress!;
+        }
+
+        /// <summary>★ S127 (K8) — the season a career saved mid-way, built back and checked; the store then holds
+        /// exactly the numbers the season held. Every refusal is by name, before anything plays, and leaves the
+        /// career file as it was.</summary>
+        public static SeasonRun Resume(byte[] bytes, WorldFile world, HistoryStore history, string engineConfigPath,
+                                       bool verbose, Action<string>? closeStepForTest = null)
+        {
+            var block = history.Progress
+                ?? throw new HistoryException(HistoryError.ProgressInvalid, "this career holds no season in progress to resume.");
+            static HistoryException Mismatch(string field, string saved, string career)
+                => new(HistoryError.SnapshotMismatch,
+                       $"the season's save disagrees with the career file on its {field} (the save says {saved}, the career " +
+                       $"{career}). Nothing was played; the career is unchanged.");
+            static string I(long v) => v.ToString(CultureInfo.InvariantCulture);
+
+            //  K8 step 1 — the rules this run plays under against the save's, then the header against the block.
+            var now = HistoryStore.EffectiveRules(CareerRulesFor(DateOnly.Parse(block.NextDay, CultureInfo.InvariantCulture), engineConfigPath));
+            if (!string.Equals(now.RulesStamp, block.RulesStamp, StringComparison.Ordinal)
+                || !string.Equals(now.ConfigSha256, block.ConfigSha256, StringComparison.Ordinal))
+                throw new HistoryException(HistoryError.ProgressRulesChanged,
+                    $"season {I(block.Season)} was saved on {block.NextDay} under " +
+                    (now.RulesStamp != block.RulesStamp ? "another build of the game" : "other settings") +
+                    " than this run's; B2a resumes a season only under the build and settings that saved it. " +
+                    "Nothing was played; the career is unchanged.");
+            var (h, bodyAt) = SeasonSnapshot.ReadHeader(bytes);
+            if (h.RulesStamp != block.RulesStamp) throw Mismatch("build stamp", h.RulesStamp[..12], block.RulesStamp[..12]);
+            if (h.ConfigSha256 != block.ConfigSha256) throw Mismatch("settings hash", h.ConfigSha256[..12], block.ConfigSha256[..12]);
+            if (h.HistoryId != history.HistoryId) throw Mismatch("career id", h.HistoryId, history.HistoryId);
+            if (h.Season != block.Season) throw Mismatch("season", I(h.Season), I(block.Season));
+            if (h.NextDay != block.NextDay) throw Mismatch("next day", h.NextDay, block.NextDay);
+            if (h.SeasonSeed != block.SeasonSeed) throw Mismatch("season seed", I(h.SeasonSeed), I(block.SeasonSeed));
+            if (h.Held != block.Held) throw Mismatch("held numbers", h.Held.ToString(), block.Held.ToString());
+
+            //  K8 step 2 — bounded decoding.
+            if (SeasonSnapshot.ReadBody(bytes, bodyAt) is not SeasonRun run)
+                throw new HistoryException(HistoryError.SnapshotMalformed,
+                    "the season's save does not hold a season. Nothing was played; the career is unchanged.");
+
+            //  The caller's resources, rebound (never stored).
+            void Set(object target, Type t, string name, object? value)
+                => t.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
+            Set(run, typeof(SeasonRun), nameof(history), history);
+            Set(run, typeof(SeasonRun), nameof(world), world);
+            Set(run, typeof(SeasonRun), nameof(engineConfigPath), engineConfigPath);
+            Set(run, typeof(SeasonRun), nameof(verbose), verbose);
+            Set(run, typeof(SeasonRun), nameof(closeStepForTest), closeStepForTest);
+            run.calendar.Rebind(run.PlayOneGame, SeasonMonthLine(verbose));
+
+            //  K8 step 3 — the restored season against the block.
+            if (run.pendingSeasonId != block.Season) throw Mismatch("restored season", I(run.pendingSeasonId), I(block.Season));
+            if (run.seasonSeed != block.SeasonSeed) throw Mismatch("restored seed", I(run.seasonSeed), I(block.SeasonSeed));
+            if (run.finished || run.disposed || run.faultedOn is not null || run.advancing)
+                throw Mismatch("restored lifecycle", "a season that is closed, disposed, failed or mid-day", "a season between days");
+            var nextDay = DateOnly.Parse(block.NextDay, CultureInfo.InvariantCulture);
+            if (run.calendar.ResumeFault(nextDay, run.totalGames, g => run.resultSlots[g] is not null) is { } fault)
+                throw Mismatch("restored season", fault, $"season {I(block.Season)} next playing {block.NextDay}");
+
+            history.ResumeHeld();
+            return run;
         }
 
         /// <summary>Ends the run. ★ S124 — the run holds no file (the close's log writer is disposed

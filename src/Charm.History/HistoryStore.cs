@@ -70,6 +70,19 @@ namespace Charm.History;
 //      and does not stop the files after it. Afterwards every recognised file left in
 //      those folders is listed by a protecting manifest or named in a warning.
 //
+//  ★ S127 (B2a) — A SEASON SAVED MID-WAY. A fourth way the career file is published:
+//    A PROGRESS SAVE — `PublishProgress`: the season's whole state is already written
+//                (by the harness) under a new name `progress/season-N-K.snap`; the store
+//                hashes it, lists it in place of the previous one, sets `progress`, and
+//                swaps the file in exactly as a save does. It publishes NO counters and NO
+//                season: the career's counters stay at the last close, and the numbers the
+//                season holds ride in `progress.held`. So the store now remembers two
+//                states: what it last PUBLISHED (written by every save) and what it HOLDS
+//                (the counters a reservation or `ResumeHeld` moved, in memory only).
+//    The close's save (`PublishSeason`) clears `progress` and unlists the snapshot. No
+//    snapshot is ever deleted by the game: a superseded one is still listed by `.bak`
+//    after the next save, then by nothing, and the open after that sets it aside.
+//
 //  ★ THE LOCK IS A SIDECAR, NOT THE FILE ITSELF (S89): replacing a file that is held
 //  open does not work on Windows. It is taken FIRST, before existence is checked,
 //  and (S124 K2) held until the store is disposed.
@@ -90,6 +103,9 @@ public sealed class HistoryStore : IDisposable
     private readonly string _lockPath;
     private FileStream? _lockHandle;
     private HistoryStateV4 _state;
+    //  ★ S127 — the state as the career file on disk holds it: what a progress save writes, with
+    //    `_state`'s held counters kept out of it. Equal to `_state` until a reservation moves a counter.
+    private HistoryStateV4 _published;
     private bool _reservationsClosed;
 
     private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV4 state,
@@ -99,6 +115,7 @@ public sealed class HistoryStore : IDisposable
         _lockPath = lockPath;
         _lockHandle = lockHandle;
         _state = state;
+        _published = state;
         OpenReport = openReport;
     }
 
@@ -119,6 +136,19 @@ public sealed class HistoryStore : IDisposable
 
     /// <summary>★ S125 — the published seasons and the rules each was played under.</summary>
     public IReadOnlyList<SeasonEntry> Seasons => _state.Seasons;
+
+    /// <summary>★ S127 — the season this career saved mid-way, or null when the career is at a close.</summary>
+    public ProgressBlock? Progress => _published.Progress;
+
+    /// <summary>★ S127 — the counters as this store holds them now (moved by reservations or by
+    /// <see cref="ResumeHeld"/>; never published until the season closes).</summary>
+    public ProgressHeld HeldCounters => new(_state.NextPersonId, _state.NextSeasonId, _state.NextGameId);
+
+    /// <summary>★ S127 — the rules as a save would record them: the given ones, or the fixed test values
+    /// inside <see cref="UseFixedRulesForTests"/>. A resume compares the rules it runs under against the
+    /// save's through this, so a save and its resume see the same values in either case.</summary>
+    public static SeasonRules EffectiveRules(SeasonRules rules)
+        => _fixedRules is { } f ? rules with { ConfigSha256 = f.ConfigSha256, RulesStamp = f.RulesStamp } : rules;
 
     /// <summary>★ S125 — what opening this career did besides loading it (a recovery from the
     /// backup, a stray file set aside, ★ S126 an unlisted file set aside or a WARNING that one
@@ -250,7 +280,7 @@ public sealed class HistoryStore : IDisposable
         var full = System.IO.Path.GetFullPath(fullPath);
         var dir = System.IO.Path.GetDirectoryName(full);
         var name = System.IO.Path.GetFileName(full);
-        foreach (var kind in new[] { "events", "gamelog", "league" })
+        foreach (var kind in new[] { "events", "gamelog", "league", "progress" })   // ★ S127 the sixth kind's folder
         {
             if (!string.Equals(dir, SiblingFolderFor(_path, kind), StringComparison.Ordinal)) continue;
             var listed = kind + "/" + name;
@@ -341,7 +371,7 @@ public sealed class HistoryStore : IDisposable
 
     // ── Quarantine (S126, K2) ────────────────────────────────────────────────
 
-    private static readonly string[] QuarantineFolders = { "events", "gamelog", "league" };
+    private static readonly string[] QuarantineFolders = { "events", "gamelog", "league", "progress" };   // ★ S127
 
     /// <summary>Move every recognised file no protecting manifest lists into the orphans folder.
     /// Writes nothing when there is nothing to move (no orphans folder is created).</summary>
@@ -369,7 +399,7 @@ public sealed class HistoryStore : IDisposable
             {
                 var name = System.IO.Path.GetFileName(file);
                 var listed = kind + "/" + name;
-                if (HistorySchemaV4.ClassifyListedPath(listed) is null) continue;   // not one of the five kinds
+                if (HistorySchemaV4.ClassifyListedPath(listed) is null) continue;   // not one of the six kinds
                 if (protectedNames.Contains(listed)) continue;
                 try
                 {
@@ -727,7 +757,12 @@ public sealed class HistoryStore : IDisposable
     {
         RequireLock("the save cannot be published");
 
-        var files = _state.Files.ToList();
+        //  ★ S127 — a season that was saved mid-way closes here: its snapshot is unlisted and
+        //    `progress` cleared, in this same save. The snapshot file stays on disk (K8); `.bak` lists
+        //    it until the next save, and the open after that sets it aside.
+        var files = _state.Files
+            .Where(f => _published.Progress is not { } p || !string.Equals(f.Path, p.Snapshot, StringComparison.Ordinal))
+            .ToList();
         foreach (var file in newFiles)
         {
             var listed = ListedPathOf(file)
@@ -771,7 +806,7 @@ public sealed class HistoryStore : IDisposable
                 $"a save publishes at most one season; {newSeasons.ToString(CultureInfo.InvariantCulture)} were held.");
         }
 
-        var next = _state with { Files = files, Seasons = seasons };
+        var next = _state with { Files = files, Seasons = seasons, Progress = null };
         HistorySchemaV4.ValidateContract(next);
         var bytes = HistorySchemaV4.Serialize(next);
 
@@ -788,6 +823,119 @@ public sealed class HistoryStore : IDisposable
                 $"could not save the career at '{_path}' — {ex.Message} The previous save stands.", ex);
         }
         _state = next;
+        _published = next;
+    }
+
+    // ── ★ S127 (B2a) — a season saved mid-way ────────────────────────────────
+
+    /// <summary>★ S127 (K4) — A PROGRESS SAVE. The caller has already written the season's snapshot under
+    /// <paramref name="snapshotPath"/> (a new name, `progress/season-N-K.snap`); the store hashes it, lists it
+    /// in place of this season's previous snapshot (if any), sets `progress` to <paramref name="block"/> with the
+    /// rules as <see cref="EffectiveRules"/> records them, and swaps the career file in with the previous save
+    /// kept as `.bak` — the same one-swap save as <see cref="PublishSeason"/>. It publishes no counter and no
+    /// season: the career's counters stay where the last close left them, the held ones ride in the block.
+    /// Refused by name, with the career file untouched, when the block is not this store's next save of the
+    /// season it holds.</summary>
+    public void PublishProgress(string snapshotPath, ProgressBlock block)
+    {
+        RequireLock("a season's progress cannot be saved");
+        static HistoryException Bad(string why) => new(HistoryError.ProgressInvalid, "a mid-season save was refused: " + why);
+        if (!_reservationsClosed)
+            throw Bad("the season has not finished taking its numbers.");
+        var listed = ListedPathOf(snapshotPath);
+        if (listed is null || !string.Equals(listed, block.Snapshot, StringComparison.Ordinal))
+            throw Bad($"'{snapshotPath}' is not the snapshot the block names ('{block.Snapshot}').");
+        if (block.Held != HeldCounters)
+            throw Bad("the block's held numbers are not the ones this season holds.");
+        var expectedSave = _published.Progress is { } prev ? prev.Save + 1 : 1;
+        if (block.Save != expectedSave)
+            throw Bad($"it is save {block.Save.ToString(CultureInfo.InvariantCulture)}; this season's next is " +
+                      $"{expectedSave.ToString(CultureInfo.InvariantCulture)}.");
+        if (_state.Files.Any(f => string.Equals(f.Path, listed, StringComparison.OrdinalIgnoreCase)))
+            throw new HistoryException(HistoryError.ListedNameTaken,
+                $"the career already lists '{listed}'; a listed file is never written again.");
+        string sha;
+        try { sha = HashFile(snapshotPath); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not read '{snapshotPath}' to fingerprint it — {ex.Message} Nothing was published.", ex);
+        }
+
+        var files = _published.Files
+            .Where(f => _published.Progress is not { } p || !string.Equals(f.Path, p.Snapshot, StringComparison.Ordinal))
+            .Append(new ListedFile(listed, sha))
+            .ToList();
+        files.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path));
+        var rules = EffectiveRules(new SeasonRules(block.NextDay, block.ConfigSha256, block.RulesStamp));
+        var effective = block with { ConfigSha256 = rules.ConfigSha256, RulesStamp = rules.RulesStamp };
+        var next = _published with { Files = files, Progress = effective };
+        HistorySchemaV4.ValidateContract(next);
+        var bytes = HistorySchemaV4.Serialize(next);
+
+        var newPath = NewPathFor(_path);
+        try
+        {
+            WriteFlushed(newPath, bytes, FileMode.Create);
+            _publishStepForTest?.Invoke("new-written");
+            File.Replace(newPath, _path, BackupPathFor(_path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not save the career at '{_path}' — {ex.Message} The previous save stands.", ex);
+        }
+        _published = next;
+        _state = _state with { Files = files, Progress = effective };
+    }
+
+    /// <summary>★ S127 (K2) — write season <paramref name="season"/>'s save <paramref name="save"/> under its final
+    /// name (a whole temp file, then one no-overwrite move) and return where it went. Refused by name when the
+    /// career already lists that name. Unlisted until <see cref="PublishProgress"/> lists it; a save that stops in
+    /// between leaves it unlisted, for the next open to set aside.</summary>
+    public string WriteProgressSnapshot(long season, long save, byte[] bytes)
+    {
+        RequireLock("a season's progress cannot be written");
+        var listed = ProgressBlock.SnapshotPathFor(season, save);
+        if (_state.Files.Any(f => string.Equals(f.Path, listed, StringComparison.OrdinalIgnoreCase)))
+            throw new HistoryException(HistoryError.ListedNameTaken,
+                $"the career already lists '{listed}'; a listed file is never written again.");
+        var path = ResolveListed(_path, listed);
+        try { PublishNewFile(path, bytes); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new HistoryException(HistoryError.PersistFailed,
+                $"could not write the season's save '{path}' — {ex.Message} Nothing was published.", ex);
+        }
+        return path;
+    }
+
+    /// <summary>★ S127 — THE READ DOOR for a season in progress: the bytes of the snapshot this career's
+    /// `progress` names (verified by hash when the career opened; the lock is held since).</summary>
+    public byte[] ReadProgressSnapshot()
+    {
+        RequireLock("a season's progress cannot be read");
+        if (_published.Progress is not { } p)
+            throw new HistoryException(HistoryError.ProgressInvalid, "this career holds no season in progress.");
+        return ReadAll(ResolveListed(_path, p.Snapshot));
+    }
+
+    /// <summary>★ S127 (K4) — a run resuming the saved season takes back exactly the numbers the season held
+    /// (`progress.held`) and closes reservations, as the season's set-up left them. Legal once, on a store that
+    /// holds a season in progress and has reserved nothing.</summary>
+    public void ResumeHeld()
+    {
+        RequireLock("a saved season cannot be resumed");
+        if (_published.Progress is not { } p)
+            throw new HistoryException(HistoryError.ProgressInvalid, "this career holds no season in progress to resume.");
+        if (_reservationsClosed || _state != _published)
+            throw new HistoryException(HistoryError.ProgressInvalid,
+                "a saved season is resumed on a store that has reserved nothing; this one already has.");
+        _state = _state with
+        {
+            NextPersonId = p.Held.NextPersonId, NextSeasonId = p.Held.NextSeasonId, NextGameId = p.Held.NextGameId,
+        };
+        _reservationsClosed = true;
     }
 
     public void Dispose()

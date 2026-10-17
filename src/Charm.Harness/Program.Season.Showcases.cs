@@ -111,6 +111,8 @@ internal static partial class Program
                 pairing.SchoolAId, pairing.SchoolBId, homeScore, awayScore);
         }
 
+        public override bool? HasPlayed(int local) => _results[local] is not null;
+
         public override void AssertComplete()
         {
             var missing = Array.FindIndex(_results, r => r is null);
