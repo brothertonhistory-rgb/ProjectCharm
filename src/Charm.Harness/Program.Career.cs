@@ -190,8 +190,8 @@ internal static partial class Program
         var logs = new List<(long, GameLogV1?, string?)>();
         for (var season = 1L; season < history.PeekNextSeasonId; season++)
         {
-            var path = GameLogWriter.FinalPathFor(history.Path, season);
-            if (!File.Exists(path)) { logs.Add((season, null, "no season log was kept")); continue; }
+            var path = history.ListedPath(CareerFileKind.Log, season);   // ★ S126 (K1) — only what the career lists
+            if (path is null || !File.Exists(path)) { logs.Add((season, null, "no season log was kept")); continue; }
             try
             {
                 var log = GameLogReader.ReadFinalized(path,

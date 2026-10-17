@@ -17,8 +17,9 @@ namespace Charm.History;
 //  durable, once, as its LAST write. A store disposed without publishing has
 //  issued nothing: its numbers were never on disk. A held number reaches disk only
 //  inside the season's own files, written at the close BEFORE the career file; if
-//  the close does not finish, the next close sets every file of that season or
-//  later aside before it writes. So no published number is ever handed out again.
+//  the close does not finish, those files are listed by no save, so the next OPEN
+//  sets them aside (S126, below) and nothing ever reads them. So no published number
+//  is ever handed out again.
 //
 //  ★ S125 — THE CAREER FILE IS THE AUTHORITY (B1b). It lists every file the career
 //  owns with each one's SHA-256, carries a fingerprint of its own (a trailer), and
@@ -51,6 +52,24 @@ namespace Charm.History;
 //  REFUSED BY NAME, never rolled back to `.bak`: the backup is for a torn career
 //  file, not for a damaged season.
 //
+//  ★ S126 — NOTHING READS WHAT THE CAREER DOES NOT LIST (B1c).
+//    THE READ BOUNDARY (K1) — `ListedPath(kind, season)` is the one door to a season's
+//      file: the full path when the career lists it, null when it does not. No reader
+//      builds a career path; a file the career does not list cannot be read, wherever
+//      it sits. Readers read by path without re-hashing: the file was verified at open
+//      and the lock is held for the run (an outside program editing a career mid-run is
+//      S89's trust boundary).
+//    QUARANTINE AT OPEN (K2) — after the career file verifies (loaded, recovered or
+//      created), every FILE in `events`, `gamelog` and `league` that is one of the five
+//      recognised kinds and that no PROTECTING manifest lists is moved into the orphans
+//      folder. The protecting manifests: the career file, always; `.bak`, only when its
+//      trailer verifies and it parses (a torn `.bak` protects nothing — its list cannot be
+//      read — which is safe because quarantine moves, never deletes). Never moved:
+//      listed files, directories, unrecognised names, lock sidecars, temp files. One
+//      attempt per file; a file that cannot be moved stays, is named in a WARNING line,
+//      and does not stop the files after it. Afterwards every recognised file left in
+//      those folders is listed by a protecting manifest or named in a warning.
+//
 //  ★ THE LOCK IS A SIDECAR, NOT THE FILE ITSELF (S89): replacing a file that is held
 //  open does not work on Windows. It is taken FIRST, before existence is checked,
 //  and (S124 K2) held until the store is disposed.
@@ -61,6 +80,9 @@ namespace Charm.History;
 //  Durability is claimed against ordinary process failure and normal atomic
 //  filesystem behaviour. Not against a machine losing power mid-write.
 // ============================================================================
+
+/// <summary>★ S126 — the kinds of season file a career lists, for <see cref="HistoryStore.ListedPath"/>.</summary>
+public enum CareerFileKind { Log, Scouting, EventRecord, LeagueState }
 
 public sealed class HistoryStore : IDisposable
 {
@@ -92,15 +114,15 @@ public sealed class HistoryStore : IDisposable
     public int StartYear => _state.StartYear;
 
     /// <summary>★ S125 — every file this career owns, verified at open (name-free paths, sorted).
-    /// No reader takes its paths from here yet (B1c).</summary>
+    /// Readers do not walk this list; they ask <see cref="ListedPath"/> for one file.</summary>
     public IReadOnlyList<ListedFile> CareerFiles => _state.Files;
 
     /// <summary>★ S125 — the published seasons and the rules each was played under.</summary>
     public IReadOnlyList<SeasonEntry> Seasons => _state.Seasons;
 
     /// <summary>★ S125 — what opening this career did besides loading it (a recovery from the
-    /// backup, a stray file set aside), one line each, for the caller to print. Empty when the
-    /// open only read.</summary>
+    /// backup, a stray file set aside, ★ S126 an unlisted file set aside or a WARNING that one
+    /// could not be), one line each, for the caller to print. Empty when the open only read.</summary>
     public IReadOnlyList<string> OpenReport { get; }
 
     // ★ The id source is a seam for ONE reason: goldens. Production mints from Guid.NewGuid(),
@@ -194,6 +216,34 @@ public sealed class HistoryStore : IDisposable
         return System.IO.Path.Combine(SiblingFolderFor(historyPath, kind), rest);
     }
 
+    /// <summary>★ S126 (K1) — THE READ DOOR. The full path of season <paramref name="season"/>'s
+    /// file of this kind when this career LISTS it; null when it does not. A null takes exactly
+    /// the branch a missing file always took. The file was verified when the career opened.</summary>
+    public string? ListedPath(CareerFileKind kind, long season)
+    {
+        var listed = ListedNameFor(kind, season);
+        if (listed is null) return null;
+        foreach (var f in _state.Files)
+            if (string.Equals(f.Path, listed, StringComparison.Ordinal))
+                return ResolveListed(_path, listed);
+        return null;
+    }
+
+    /// <summary>The name-free path a career lists for this kind and season, or null for a season
+    /// no file of that kind can belong to.</summary>
+    private static string? ListedNameFor(CareerFileKind kind, long season)
+    {
+        var n = season.ToString(CultureInfo.InvariantCulture);
+        return kind switch
+        {
+            CareerFileKind.Log         => season >= 1 ? "gamelog/season-" + n + ".log" : null,
+            CareerFileKind.Scouting    => season >= 1 ? "gamelog/season-" + n + ".scout" : null,
+            CareerFileKind.EventRecord => season >= 1 ? "events/season-" + n + ".json" : null,
+            CareerFileKind.LeagueState => season >= 0 ? LeagueStateFile.ListedPathFor(season) : null,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
+
     /// <summary>The listed path for a file on disk, or null when the file is not one a career owns.</summary>
     private string? ListedPathOf(string fullPath)
     {
@@ -279,12 +329,81 @@ public sealed class HistoryStore : IDisposable
         {
             var report = new List<string>();
             var state = LoadRecoverOrCreate(full, worldFingerprint, leagueIfNew, startYearIfNew, report);
+            Quarantine(full, state, report);                       // ★ S126 (K2)
             return new HistoryStore(full, lockPath, lockHandle, state, report);
         }
         catch
         {
             lockHandle.Dispose();
             throw;
+        }
+    }
+
+    // ── Quarantine (S126, K2) ────────────────────────────────────────────────
+
+    private static readonly string[] QuarantineFolders = { "events", "gamelog", "league" };
+
+    /// <summary>Move every recognised file no protecting manifest lists into the orphans folder.
+    /// Writes nothing when there is nothing to move (no orphans folder is created).</summary>
+    private static void Quarantine(string full, HistoryStateV4 state, List<string> report)
+    {
+        // Case-insensitive on purpose: a name the save lists in any case is never moved.
+        var protectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in state.Files) protectedNames.Add(f.Path);
+        foreach (var listed in BackupListOrNothing(full)) protectedNames.Add(listed);
+
+        foreach (var kind in QuarantineFolders)
+        {
+            var folder = SiblingFolderFor(full, kind);
+            if (!Directory.Exists(folder)) continue;     // absent, or a regular file standing there
+            var folderName = System.IO.Path.GetFileName(folder);
+            string[] files;
+            try { files = Directory.GetFiles(folder); }  // files only: a directory is never moved
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                report.Add($"WARNING: could not look inside '{folderName}' to set aside files this career does not list — " +
+                           $"{ex.Message} Nothing reads an unlisted file.");
+                continue;
+            }
+            foreach (var file in files.OrderBy(f => System.IO.Path.GetFileName(f), StringComparer.Ordinal))
+            {
+                var name = System.IO.Path.GetFileName(file);
+                var listed = kind + "/" + name;
+                if (HistorySchemaV4.ClassifyListedPath(listed) is null) continue;   // not one of the five kinds
+                if (protectedNames.Contains(listed)) continue;
+                try
+                {
+                    var moved = MoveToOrphans(full, file, folderName + "/" + name);
+                    report.Add($"Set aside a file this career does not list: '{moved}'.");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // One attempt, no retry. Nothing can read it (K1); a close that needs its name refuses (K3).
+                    report.Add($"WARNING: could not set aside '{folderName}/{name}', a file this career does not list — " +
+                               $"{ex.Message} Nothing reads it; a season close that needs its name will refuse.");
+                }
+            }
+        }
+    }
+
+    /// <summary>The paths `.bak` lists when its trailer verifies and it parses; otherwise nothing —
+    /// a backup whose list cannot be read protects nothing (K2 rule 2). The listed files are not
+    /// verified here: protection needs only the names.</summary>
+    private static IEnumerable<string> BackupListOrNothing(string full)
+    {
+        var bak = BackupPathFor(full);
+        if (!File.Exists(bak)) return Array.Empty<string>();
+        try
+        {
+            var payload = HistorySchemaV4.SplitTrailer(File.ReadAllBytes(bak), out var verified);
+            if (payload is null || !verified) return Array.Empty<string>();
+            return HistorySchemaV4.Parse(payload).Files.Select(f => f.Path).ToList();
+        }
+        catch (Exception ex) when (ex is HistoryException or IOException or UnauthorizedAccessException
+                                       or System.Text.Json.JsonException or InvalidOperationException
+                                       or FormatException or OverflowException)
+        {
+            return Array.Empty<string>();
         }
     }
 
@@ -555,7 +674,7 @@ public sealed class HistoryStore : IDisposable
     /// <summary>★ S125 — write season <paramref name="season"/>'s league state under its final name
     /// (a whole temp file, then one no-overwrite move) and return where it went. Refused by name when
     /// the career already lists that name (K8). The file is unlisted until <see cref="PublishSeason"/>
-    /// lists it; a close that stops in between leaves it for the next close to set aside.</summary>
+    /// lists it; a close that stops in between leaves it unlisted, for the next open to set aside.</summary>
     public string WriteLeagueState(long season, IEnumerable<SchoolPrestige> prestige)
     {
         RequireLock("a league state cannot be written");
@@ -575,7 +694,7 @@ public sealed class HistoryStore : IDisposable
     }
 
     /// <summary>The latest league state this career lists, read and validated (lineage, season,
-    /// canonical bytes). Every career lists at least `league-0`.</summary>
+    /// canonical bytes). Every career lists at least `league-0`. ★ S126 — read through the door.</summary>
     public LeagueState ReadLatestLeagueState()
     {
         long latest = -1;
@@ -584,7 +703,9 @@ public sealed class HistoryStore : IDisposable
                 latest = c.N;
         if (latest < 0)
             throw new HistoryException(HistoryError.ManifestMismatch, "the career lists no league state.");
-        return LeagueStateFile.Read(LeagueStateFile.PathFor(_path, latest), _state.HistoryId, latest);
+        var path = ListedPath(CareerFileKind.LeagueState, latest)
+                   ?? throw new HistoryException(HistoryError.ManifestMismatch, "the career lists no league state.");
+        return LeagueStateFile.Read(path, _state.HistoryId, latest);
     }
 
     // ── A save (K2) ──────────────────────────────────────────────────────────

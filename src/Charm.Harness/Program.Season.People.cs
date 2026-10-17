@@ -70,10 +70,10 @@ internal static partial class Program
     /// career, another world or another season is refused by the reader before a man is read.</summary>
     private static CareerPeople ReadCareerPeople(HistoryStore history, WorldFile world, long prev)
     {
-        var path = GameLogWriter.FinalPathFor(history.Path, prev);
-        if (!File.Exists(path))
+        var path = history.ListedPath(CareerFileKind.Log, prev);   // ★ S126 (K1) — only what the career lists
+        if (path is null || !File.Exists(path))
             throw new InvalidOperationException(
-                $"S115 career: season {prev} of this career kept no season log at '{path}', so there is nobody to " +
+                $"S115 career: season {prev} of this career kept no season log, so there is nobody to " +
                 "carry into this season. A career's people live in its season logs; without last season's log " +
                 "the career cannot continue — start a new career.");
 

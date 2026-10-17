@@ -30,8 +30,9 @@ namespace Charm.Harness;
 //    C3  a number is never published twice — game numbers once each across the career;
 //        a man kept across seasons is the same man; the reference's numbers exactly.
 //    C4  the set-aside — the recognised kinds (★ S125: five) of this season or later, moved
-//        byte-untouched; earlier seasons and unrecognised files never touched; a blocked
-//        orphans folder refuses the close by name with nothing published.
+//        byte-untouched (★ S126: by the career's OPEN, as files no save lists); earlier
+//        seasons and unrecognised files never touched; a blocked orphans folder: the open
+//        warns, and the close's names check refuses by name with nothing published.
 //    C5  the close's order, observed step by step, with a negative control.
 //    C6  page-only: the fresh-process re-run times and what each set aside.
 //
@@ -75,7 +76,7 @@ internal static partial class Program
         string League() => "career.league/league-" + n + ".json";
         string[]? expected = step switch
         {
-            "set-aside" or "log" => Array.Empty<string>(),
+            "names" or "log" => Array.Empty<string>(),
             "log-open" => new[] { Prog() },
             "scouting" => new[] { Log() },
             "record" => new[] { Log(), Scout() },
@@ -475,7 +476,7 @@ internal static partial class Program
                 var record = Path.Combine(Dir("blocked"), "career.events", "season-2.json");
                 File.WriteAllText(record, "{ \"planted\": \"record\" }");
                 var recordBefore = File.ReadAllBytes(record);
-                File.WriteAllText(CareerOrphansFolderFor(CareerOf("blocked")), "a file standing where the orphans folder goes");
+                File.WriteAllText(HistoryStore.SiblingFolderFor(CareerOf("blocked"), "orphans"), "a file standing where the orphans folder goes");
                 var child = Child("blocked", seedTwo);
                 var verdict = SeasonCloseChildVerdict(child.Exit, child.Output, CareerOf("blocked"), 2, afterTwo);
                 var refusedByName = child.Output.Contains("SEASON CLOSE REFUSED", StringComparison.Ordinal)
@@ -514,12 +515,12 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 var steps = observed.Select(o => o.Step).ToList();
-                var expectedSteps = new[] { "set-aside", "log", "log-open", "scouting", "record", "league", "counters", "published" };
+                var expectedSteps = new[] { "names", "log", "log-open", "scouting", "record", "league", "counters", "published" };
                 var faults = observed.Where(o => o.Step != "published")
                                      .Select(o => SeasonCloseOrderFault(o.Step, o.Files, o.Career, masterCareer, 2))
                                      .Where(f => f is not null).ToList();
                 var afterClose = File.ReadAllBytes(CareerOf("ref"));
-                Check("C5a: ★ at each close step the season files on disk are exactly the earlier steps' — none at set-aside and log; " +
+                Check("C5a: ★ at each close step the season files on disk are exactly the earlier steps' — none at names and log; " +
                       "the unfinished log at log-open; the log at scouting; the log and scouting file at record; all three at league; " +
                       "★ S125 those and the league state at counters — " +
                       "and the career file is the pre-season bytes at every step; after the close it is not",

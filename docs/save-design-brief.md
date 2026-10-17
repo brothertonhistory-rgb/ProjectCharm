@@ -544,8 +544,9 @@ proof** (ChatGPT r2, accepted). The risk ratings are ChatGPT's.
 > - **B1b — the career file becomes trustworthy. ✅ Shipped S125** (journal S125; §14j): v4 with its checksum and file
 >   list (§4a, §14c), the three ways to publish (§4b), the backup and recovery, the rules record (§2d — the record only;
 >   §4d's check is B2's), the league-state file (§6), the C-60 refusal of v3 careers. Its proof is Phase 116.
-> - **B1c — nothing reads a file the career does not list:** `CareerFiles` and quarantine for every reader (§2a, §4c);
->   retires S124's set-aside rule (§14i).
+> - **B1c — nothing reads a file the career does not list. ✅ Shipped S126** (journal S126; §14k): one read door on the
+>   store for every reader, quarantine at every open (§2a, §4c), the close's names check; S124's set-aside retired (§14i).
+>   Its proof is Phase 117. **B1 is finished.**
 
 **The gate, before any code:**
 - **A formal input audit**, as a table:
@@ -891,7 +892,7 @@ contract of a low-level API that survives.**
 | ✅ **S125** Phase 80 B10 (born as a valid history; the canonical output equals `history_v3_golden.json`; validation leaves the file byte-identical; the world untouched; a different world refused; a held lock refused) | the v3 file format and lifecycle | **2** for the golden; **1** for the rest | A **hand-written v4 golden** replaces the v3 one, as S119 did: payload plus checksum line (§14c). A v3 file is refused by the C-60 sentence. The world, lock and different-world assertions stand unchanged; the lock assertion is extended to "held for the whole run" (§4c). |
 | ✅ **S125** Phase 80 B4, B8, B9, B11 | identity uniqueness, isolation, pool slots, no file without a history | **1** | Unchanged. |
 | ✅ **S124** Phase 105 C2b, C3c (the high-water after season one is 4,512; freshmen move it by the class size) | counters after a completed season | **1** | Unchanged — published at close, with the same values. |
-| ◐ **S125** Phase 105 C6a (the previous season kept no log → refused, nothing spent) | a season can exist without a log | **3** | The test-only path that runs a career season without a log (`bootstrapPeopleForTest`, which the schedule, event, contract and memory checks rely on) is kept: such a season is published with a `noLog` flag that only that switch can set. The refusal for a real season after a `noLog` one stands, with its message. **New beside it:** a listed log deleted from disk is refused at load by name (Q6) — a different, earlier refusal. |
+| ✅ **S126** Phase 105 C6a (the previous season kept no log → refused, nothing spent) | a season can exist without a log | **3** | The test-only path that runs a career season without a log (`bootstrapPeopleForTest`, which the schedule, event, contract and memory checks rely on) is kept: such a season is published with a `noLog` flag that only that switch can set. The refusal for a real season after a `noLog` one stands, with its message. **New beside it:** a listed log deleted from disk is refused at load by name (Q6) — a different, earlier refusal. |
 | ✅ **S125** Phase 105 C6b (history mode without the retained log is refused) | the log is mandatory | **1** | Unchanged. |
 | ✅ **S125** Phase 81 A10 (an existing finished log refuses, with no artifact left behind) | the log writer never overwrites | **3** | The writer keeps this refusal. B1 reaches it only through an unmovable orphan, and then the close is refused (F6, B1·3). |
 | ✅ **S125** Phase 81 A5, A9, A11, A1, A2 | the log's own format and integrity | **1** | Unchanged. The log format does not change (Q5). |
@@ -901,9 +902,9 @@ contract of a low-level API that survives.**
 | ✅ **S124** Phase 89 C8i (a failure forced at the rename leaves the NotPlayed record) | a half-finished season keeps a NotPlayed record | **2** | Replaced by B1·3: a failure at close leaves the career at its last boundary and the season re-runs. There is no NotPlayed record any more. |
 | ✅ **S124** Phase 88 C7a (a record write failing after the commit does not invalidate the season) | `WriteFailed`: the season stands, with a hole | **2 — the rule reverses** | A failed close does not publish the season; it re-runs from day one. `EventRecordStatus.WriteFailed` and its page line are retired. |
 | ✅ **S124** Phase 88 C5b, C5c (a refusal spends no season id and writes no record) | refusals are free | **1** | Stronger now: nothing is published before close. |
-| ◐ **S124** Phase 88 C9a–C9c (an existing record for the pending season refuses the commit and is never mistaken for this run's) | `MteRefuseExistingRecord` | **2** | An unlisted record for the pending season is an orphan: quarantined at load, unreachable by any reader, and refused at close only if it cannot be moved (F6). The refusal's message moves to the close. |
-| ◐ **S125** Phase 88 C6d–C6i (another career's record, a different season's, an unsupported version, malformed JSON, or a deleted year is each a **silent hole**; a changed world fingerprint is accepted) | how the record reader treats a gap | **3** | **Unreachable in a v4 career**: a listed file is verified at load, and an unlisted one cannot be read. Kept as the reader's own contract — B1 changes no reader's internals — and driven by constructed `CareerFiles` with gaps. **New beside them:** the same gaps in a real career are refused at load (B1·4). Removing hole tolerance from the readers is a later cleanup, not B1. |
-| ◐ **S125** Phase 90 (rotation) C2a-iv, C5a–C5c; Phase 91 (host debt) C1d, C3b–C3c; Phase 94 (contracts) C10b, C10e, C8b/C10d; Phase 87 (season memory) C8iii | holes, damage and forgotten records in the 8-season window | **3** | As the row above: unreachable in a v4 career, kept as the readers' contracts, driven by constructed `CareerFiles`. |
+| ✅ **S126** Phase 88 C9a–C9c (an existing record for the pending season refuses the commit and is never mistaken for this run's) | `MteRefuseExistingRecord` | **2** | An unlisted record for the pending season is an orphan: quarantined at load, unreachable by any reader, and refused at close only if it cannot be moved (F6). The refusal's message moves to the close. |
+| ✅ **S126** Phase 88 C6d–C6i (another career's record, a different season's, an unsupported version, malformed JSON, or a deleted year is each a **silent hole**; a changed world fingerprint is accepted) | how the record reader treats a gap | **3** | **Unreachable in a v4 career**: a listed file is verified at load, and an unlisted one cannot be read. Kept as the reader's own contract — B1 changes no reader's internals — and driven by constructed `CareerFiles` with gaps. **New beside them:** the same gaps in a real career are refused at load (B1·4). Removing hole tolerance from the readers is a later cleanup, not B1. |
+| ✅ **S126** Phase 90 (rotation) C2a-iv, C5a–C5c; Phase 91 (host debt) C1d, C3b–C3c; Phase 94 (contracts) C10b, C10e, C8b/C10d; Phase 87 (season memory) C8iii | holes, damage and forgotten records in the 8-season window | **3** | As the row above: unreachable in a v4 career, kept as the readers' contracts, driven by constructed `CareerFiles`. |
 | ✅ **S124** Phase 87 C9c (peeking moves nothing on disk, and the peek is the next reservation) | peek equals the next issue | **1** | Unchanged: the peek equals the next provisional allocation, which equals the next published id. |
 | ✅ **S124** Phase 89 C10b, C10c (the ledger spends exactly the counted ids; dormant events spend none) | counts | **1** | Unchanged. |
 | ✅ **S124** Phase 110 (the season after 9998 is refused with nothing written) | edge refusals | **1** | Unchanged. |
@@ -932,6 +933,19 @@ list: Phase 87 C2 and Phase 89 C6/C7 (hand publishes, now `PublishSeason`); Phas
 C4d (the folder gains `league-0`), C4g (re-pinned `9c892e97…` → `de270510…`, portable, and the backup in the folder);
 Phase 115 C1a, C2, C4, C5 (the league step and the fifth set-aside kind); Phase 110 C5 (v3 refused beside v2); Phase 81 A6
 (born v4).
+
+★ **Marked after S126 (B1c; §14k).** Every row is now settled. Phase 105 C6a: a season that kept no log lists none, and
+"not listed" takes the reader's old "absent" branch — the refusal and its message stand (the path is no longer named; an
+unlisted file has none a reader may build). Phase 88 C9: a record for the pending season planted **before** the open is set
+aside by the open and the season publishes its real record (C9a–c); planted **after** the open, the close's names check
+refuses by name with nothing published (new C9d). The hole rows (Phase 88 C6d–C6i; Phases 87, 90, 91, 94): the readers
+keep their hole handling, since "not listed" is the same branch as "absent"; they are driven by `RelistCareerForCheck`,
+which since S126 also **adds** a present unlisted file of a published season. **Rows B1c found that this ledger did not
+list:** Phase 112 **C5b-4** (a zeroed scouting file written after the re-list — re-listed after the write; missed by the
+B1c prompt's own ledger, found at the gate); Phase 87 C2d/C2e (re-listed after the plant) and C8iv (season two published by
+hand listing the copied log); Phases 94 C10e→C4, 106 C7e, 107 C3g (a restored file, re-listed by the existing call);
+Phase 115 C2, C4 (set aside by the open), C4c (the open warns, the names check refuses), C5 (`names` replaces
+`set-aside`); Phase 116 C3e (set aside by the `season` command's open).
 
 **The new invariants that replace kind 2**, each with its own B1 test:
 
@@ -1093,3 +1107,24 @@ its portable digest (the `gamelog/` hashes masked) — B2's progress block must 
 pinned field either. (2) **Verification reads every listed file at every open**: a stock season is about 26 MB, not the
 ~1.2 MB the B1b prompt assumed. Not measurable at two seasons (Phase 114: 288.1s on S125, 289.3s on S124,
 alternated); worth re-measuring when careers run long.
+
+### 14k. After S126 — what B1c delivered
+
+**B1c shipped (S126, verified on Emmett's machine; journal S126, design "The career file is trustworthy" and "A season
+leaves no trace until it closes"). B1 is finished: the career file alone decides what a career is.** One read door on the
+store, `ListedPath(kind, season)`, returns a file's path only when the career lists it; every reader of an old season — the
+pages, last season's people, host memory and the rotation, contracts, tournament memory, the camp's scouting read, the
+latest league state — takes its path from it, and "not listed" takes the branch "absent" always took, so a career the game
+saved reads exactly what it read before. **Quarantine at every open** (§4c step 3): files of the five recognised kinds that
+no protecting manifest lists move into `career.orphans/`, byte-untouched; the protecting manifests are the career file and
+a `.bak` whose trailer verifies and which parses — a torn `.bak` protects nothing, safe because quarantine never deletes;
+directories, unrecognised names, lock sidecars, temp files and `.new` stay; one attempt per file, a `WARNING:` line for one
+that cannot move. **The close's first step is a names check** (free = neither a file nor a directory), refusing by name
+before any writer runs. S124's close-time set-aside is retired. Readers do not re-hash on read (verified at open, the lock
+held; O-137). O-136 closed: a scouting failure prints a `SEASON ERROR` line. **Proof: Phase 117**, with a source scan that
+keeps readers off the path builders and the re-list helper inside the checks.
+
+**What it hands B2.** (1) B2's working files — the live log (Q5) and the snapshot — must be listed, live under a name that is
+not one of the five recognised kinds, or be set aside at every open by design; the choice is B2's, made explicitly. (2) A
+new reader asks `ListedPath`; one that builds a path moves Phase 117 C3's counted table. (3) A career-file pin stays a
+portable digest (§14j).

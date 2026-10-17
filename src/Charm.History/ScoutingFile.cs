@@ -144,15 +144,19 @@ public static class ScoutingFile
     // ── Reading ─────────────────────────────────────────────────────────────
 
     /// <summary>A complete, valid scouting file for exactly this career, world and season — or a
-    /// refusal by name. Never a partial list.</summary>
-    public static IReadOnlyList<ScoutingRecord> Read(string historyPath, ScoutingBindings bindings)
+    /// refusal by name. Never a partial list.
+    ///
+    /// <para>★ S126 (K1) — takes the FILE's path, which a career reader gets from
+    /// <see cref="HistoryStore.ListedPath"/>; null means the career does not list one, and takes
+    /// the branch a missing file always took. This assembly no longer builds a read path.</para></summary>
+    public static IReadOnlyList<ScoutingRecord> Read(string? scoutingPath, ScoutingBindings bindings)
     {
-        var path = PathFor(historyPath, bindings.SeasonId);
-        if (!File.Exists(path))
+        if (scoutingPath is null || !File.Exists(scoutingPath))
             throw new ScoutingException(ScoutingError.Missing,
-                $"season {bindings.SeasonId.ToString(CultureInfo.InvariantCulture)} of this career kept no scouting file at '{path}', " +
+                $"season {bindings.SeasonId.ToString(CultureInfo.InvariantCulture)} of this career kept no scouting file, " +
                 "so its players' potential is unknown. Potential is never re-rolled — " +
                 GameLogSchemaV1.OlderVersionSentence + " if this career predates the offseason camp.");
+        var path = scoutingPath;
         string text;
         try { text = Encoding.UTF8.GetString(File.ReadAllBytes(path)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

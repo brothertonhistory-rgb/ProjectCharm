@@ -1890,6 +1890,15 @@ internal static partial class Program
             history?.Dispose();
             return;
         }
+        catch (ScoutingException sx)
+        {
+            // ★ S126 (O-136) — a scouting file refused at the set-up (missing, damaged, another
+            //   career's) or not written at the close: a named line, never a stack trace. Nothing
+            //   is published either way.
+            Console.WriteLine($"SEASON ERROR [{sx.Error}]: {sx.Message}");
+            history?.Dispose();
+            return;
+        }
         catch (InvalidOperationException ex)
         {
             Console.WriteLine($"SEASON ERROR: {ex.Message}");

@@ -615,39 +615,78 @@ internal static partial class Program
 
             // ════════════════════════════════════════════════════════════════════
             //  C9 — A RECORD ALREADY CLAIMING THE PENDING SEASON. ★ S124 (K4) REPLACED S97's
-            //  refusal: such a file can only be left by a close that did not finish (or placed by
-            //  hand), so the close SETS IT ASIDE into career.orphans/, byte-untouched, and writes
-            //  the season's real record.
+            //  refusal; ★ S126 (B1c) moved the set-aside to the OPEN. Such a file can only be left
+            //  by a close that did not finish (or placed by hand), and the career does not list it:
+            //  planted before the open, the open SETS IT ASIDE into career.orphans/, byte-untouched,
+            //  and the season writes its real record (C9a–c). Planted AFTER the open, it is in the
+            //  way of a name the close must write: the close refuses by name, nothing published (C9d).
             // ════════════════════════════════════════════════════════════════════
             var collidePath = Path.Combine(scratch, "collide.json");
             string? collideMsg;
             long cBefore, cAfter;
             byte[] plantedBefore;
             string planted, setAsideAt;
+            List<string> collideReport;
+            using (var store = OpenCareer(collidePath, mte))
+                cBefore = store.PeekNextSeasonId;
+            Directory.CreateDirectory(MteRecordFolderFor(collidePath));
+            planted = MteRecordPathFor(collidePath, cBefore);
+            File.WriteAllText(planted, "{ \"planted\": true }");
+            plantedBefore = File.ReadAllBytes(planted);
             using (var store = OpenCareer(collidePath, mte))
             {
-                cBefore = store.PeekNextSeasonId;
-                Directory.CreateDirectory(MteRecordFolderFor(collidePath));
-                planted = MteRecordPathFor(collidePath, cBefore);
-                File.WriteAllText(planted, "{ \"planted\": true }");
-                plantedBefore = File.ReadAllBytes(planted);
+                collideReport = store.OpenReport.ToList();
                 collideMsg = Refusal(() =>
                     RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
             }
             using (var store = OpenCareer(collidePath, mte))
                 cAfter = store.PeekNextSeasonId;
-            setAsideAt = Path.Combine(CareerOrphansFolderFor(collidePath), Path.GetFileName(MteRecordFolderFor(collidePath)),
+            setAsideAt = Path.Combine(HistoryStore.SiblingFolderFor(collidePath, "orphans"), Path.GetFileName(MteRecordFolderFor(collidePath)),
                                       Path.GetFileName(planted));
             Check("C9a: ★ S124 — a record already claiming the pending season no longer refuses the season: " +
                   "the season plays and PUBLISHES",
                   collideMsg is null && cAfter == cBefore + 1,
                   collideMsg ?? $"peek {cBefore} → {cAfter}");
-            Check("C9b: ★ the planted file was SET ASIDE into career.orphans/, byte-untouched",
-                  File.Exists(setAsideAt) && File.ReadAllBytes(setAsideAt).SequenceEqual(plantedBefore),
-                  setAsideAt);
+            Check("C9b: ★ S126 — the planted file was SET ASIDE by the career's OPEN into career.orphans/, byte-untouched, " +
+                  "and the open said so",
+                  File.Exists(setAsideAt) && File.ReadAllBytes(setAsideAt).SequenceEqual(plantedBefore)
+                  && collideReport.Any(l => l.StartsWith("Set aside a file this career does not list", StringComparison.Ordinal)
+                                            && l.Contains(Path.GetFileName(planted), StringComparison.Ordinal)),
+                  setAsideAt + " / " + string.Join(" | ", collideReport));
             Check("C9c: and the season's REAL record now stands at the path — never the planted bytes",
                   File.Exists(planted) && !File.ReadAllBytes(planted).SequenceEqual(plantedBefore)
                   && File.ReadAllText(planted).Contains("\"formatVersion\"", StringComparison.Ordinal));
+
+            //  C9d — the same record planted AFTER the open: the close's names check refuses by name.
+            var latePath = Path.Combine(scratch, "collide-late.json");
+            string? lateMsg;
+            long lBefore, lAfter;
+            byte[] lateCareerBefore, latePlantedBefore;
+            string latePlanted;
+            bool lateLeagueWritten;
+            using (var store = OpenCareer(latePath, mte))
+            {
+                lBefore = store.PeekNextSeasonId;
+                lateCareerBefore = File.ReadAllBytes(latePath);
+                Directory.CreateDirectory(MteRecordFolderFor(latePath));
+                latePlanted = MteRecordPathFor(latePath, lBefore);
+                File.WriteAllText(latePlanted, "{ \"planted\": \"after the open\" }");
+                latePlantedBefore = File.ReadAllBytes(latePlanted);
+                lateMsg = Refusal(() =>
+                    RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
+                lateLeagueWritten = File.Exists(LeagueStateFile.PathFor(latePath, lBefore));
+            }
+            var lateCareerAfter = File.ReadAllBytes(latePath);
+            var latePlantedStill = File.Exists(latePlanted) && File.ReadAllBytes(latePlanted).SequenceEqual(latePlantedBefore);
+            using (var store = OpenCareer(latePath, mte))
+                lAfter = store.PeekNextSeasonId;
+            Check("C9d: ★ S126 — a record planted AFTER the open is in the way of the close: refused BY NAME at the names " +
+                  "check, nothing published (the career file byte-identical), the planted bytes untouched, no league state written",
+                  lateMsg is not null && lateMsg.Contains("SEASON CLOSE REFUSED", StringComparison.Ordinal)
+                  && lateMsg.Contains(latePlanted, StringComparison.Ordinal)
+                  && lateCareerAfter.SequenceEqual(lateCareerBefore) && latePlantedStill && !lateLeagueWritten
+                  && lAfter == lBefore,
+                  lateMsg ?? "NO REFUSAL");
         }
         catch (Exception ex)
         {

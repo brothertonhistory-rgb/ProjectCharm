@@ -326,7 +326,7 @@ internal static partial class Program
                       && File.Exists(tornKept) && Same(File.ReadAllBytes(tornKept), torn)
                       && Same(Bytes("c3-torn"), masterCareer) && Same(Bytes("c3-torn", bak), masterCareer),
                       string.Join(" / ", report));
-                //  It is now at season one; its lost save had published season two. The next close sets those files aside
+                //  It is now at season one; its lost save had published season two. ★ S126 — the next open sets those files aside
                 //  and season two plays again, identical — through the `season` command, which prints the recovery.
                 CopyDir("two", "c3-replay");
                 File.WriteAllBytes(CareerOf("c3-replay"), torn);

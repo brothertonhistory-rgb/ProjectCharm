@@ -773,8 +773,8 @@ internal static partial class Program
         {
             var seasonId = pendingSeasonId - back;
             if (seasonId < 1) continue;
-            var path = MteRecordPathFor(history.Path, seasonId);
-            if (!File.Exists(path)) continue;                       // silent hole
+            var path = history.ListedPath(CareerFileKind.EventRecord, seasonId);   // ★ S126 (K1)
+            if (path is null || !File.Exists(path)) continue;       // silent hole (not listed, or gone)
             try
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(path));
@@ -828,8 +828,8 @@ internal static partial class Program
     //  next run refused (S97's collision precheck). Now the set-up builds the NotPlayed body
     //  in memory (MteRecordBytes, the exact bytes it used to write) and the close writes the
     //  final record once — finishes included when any event played — before the career file.
-    //  A stale record for the pending season is SET ASIDE by the close (CareerSetAsideUnfinished),
-    //  never refused and never overwritten.
+    //  ★ S126 — a stale record for the pending season is unlisted, so the career's OPEN sets it
+    //  aside; one that could not be moved refuses the close by name (CareerCheckNamesFree).
 
     /// <summary>★ S124 — publish a season's record atomically and WITHOUT overwriting: a whole
     /// temp file, then one no-overwrite move. <paramref name="publish"/> is the injected seam
@@ -859,110 +859,45 @@ internal static partial class Program
     }
 
     /// <summary>The real publication. overwrite:false — the move throws if the destination
-    /// exists, which cannot happen after the close's set-aside unless something wrote it since.</summary>
+    /// exists, which cannot happen after the close's names check unless something wrote it since.</summary>
     private static void MteDefaultPublish(string temp, string final)
         => File.Move(temp, final, overwrite: false);
 
-    // ── S124 (K4): an unfinished season's files, set aside ───────────────────────
+    // ── S126 (K3): the close's first step — every name it will write is free ─────
     //
-    //  ★ A TEMPORARY v3 RECOVERY RULE. The career file is published LAST and one writer holds
-    //  the lock, so a file belonging to a season at or past the pending one can only have been
-    //  written by a close that did not finish (or placed by hand). No reader opens such a file:
-    //  every reader computes the path of an EARLIER season. So the close's first step moves
-    //  every such file into `career.orphans/`, keeping its relative path, before it writes.
+    //  ★ REPLACES S124's close-time set-aside (retired with its helpers). A file a career does
+    //  not list is now set aside when the career OPENS (HistoryStore, K2), and nothing reads it
+    //  wherever it sits (K1). So at the close, a file standing at a name this season must write
+    //  can only be one quarantine could not move (it printed a WARNING at the open) or one that
+    //  something wrote since. Either way the close refuses by name, BEFORE any writer runs,
+    //  and nothing is published. Each writer's own refusal of an existing name stays as the
+    //  second line of defence.
     //
-    //  Two invariants, which carry into B1c (where the career's own file list replaces this
-    //  inference from names and counters):
-    //    • a set-aside file is NEVER deleted or changed — moved within the career's folder, so
-    //      a rename, byte for byte;
-    //    • only the recognised kinds are moved: `career.events/season-N.json`,
-    //      `career.gamelog/season-N.log`, `season-N.log.inprogress`, `season-N.scout`, and
-    //      ★ S125 `career.league/league-N.json` (a close that stopped after writing its league
-    //      state, before the save, leaves one behind; league-0 is never moved, since N ≥ 1).
-    //      Lock sidecars (reused by design, S90), temp files and anything else stay exactly
-    //      where they are.
-    //    • ★ S125 (K8) — none of them is listed: every file of a season at or past the pending
-    //      one belongs to a season the current save (and its backup) has not published.
-    //
-    //  A file that cannot be moved refuses the close by name. Nothing has been published at
-    //  that point, so the career stays at its last finished season.
+    //  "Free" means neither a file NOR a directory: File.Exists is false for a directory, and a
+    //  directory at a writer's final name would fail the writer's move after earlier files
+    //  were written.
 
-    private static readonly string[] CareerSeasonFileSuffixesInLogFolder = { ".log", ".log.inprogress", ".scout" };
-
-    /// <summary>The folder a career's set-aside files go to — named for the history FILE, exactly
-    /// as the event-record and game-log folders are.</summary>
-    private static string CareerOrphansFolderFor(string historyPath)
+    /// <summary>★ S126 (K3) — refuse the close by name if any path it is about to write is taken.
+    /// Checks only the files this close will write: the log and its <c>.inprogress</c> when it keeps
+    /// a log, the scouting file when the camp ran, always the event record and the league state.</summary>
+    private static void CareerCheckNamesFree(string historyPath, long pendingSeasonId, bool keepsLog, bool writesScouting)
     {
-        var full = Path.GetFullPath(historyPath);
-        if (full.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) full = full[..^5];
-        return full + ".orphans";
-    }
-
-    /// <summary>The season a recognised file name belongs to, or null. Canonical only: "season-",
-    /// then a positive decimal with no sign and no leading zero, then exactly one recognised
-    /// suffix. A name the game would never write is not recognised, and so never moved.</summary>
-    private static long? CareerSeasonOfFileName(string name, IReadOnlyList<string> suffixes, string prefix = "season-")
-    {
-        if (!name.StartsWith(prefix, StringComparison.Ordinal)) return null;
-        foreach (var suffix in suffixes)
+        var names = new List<string>();
+        if (keepsLog)
         {
-            if (!name.EndsWith(suffix, StringComparison.Ordinal)) continue;
-            var digits = name[prefix.Length..^suffix.Length];
-            if (digits.Length == 0 || digits[0] == '0' || !digits.All(char.IsAsciiDigit)) continue;
-            if (long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var season))
-                return season;
+            var log = GameLogWriter.FinalPathFor(historyPath, pendingSeasonId);
+            names.Add(log);
+            names.Add(log + ".inprogress");
         }
-        return null;
-    }
-
-    /// <summary>★ S124 (K4) — move every recognised file of a season ≥ <paramref name="pendingSeasonId"/>
-    /// into <c>career.orphans/</c>. Returns what was moved, as paths relative to the career's
-    /// folder with '/' separators, in the order moved (events first, then the log folder, then ★ S125 the league folder, each by
-    /// name). A folder that does not exist, or is not a folder, holds nothing to move.</summary>
-    private static List<string> CareerSetAsideUnfinished(string historyPath, long pendingSeasonId)
-    {
-        var plan = new List<(string Source, string Relative)>();
-        foreach (var (folder, suffixes, prefix) in new[]
-                 {
-                     (MteRecordFolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }, "season-"),
-                     (GameLogWriter.LogFolderFor(historyPath), CareerSeasonFileSuffixesInLogFolder, "season-"),
-                     (LeagueStateFile.FolderFor(historyPath), (IReadOnlyList<string>)new[] { ".json" }, "league-"),
-                 })
-        {
-            if (!Directory.Exists(folder)) continue;
-            var folderName = Path.GetFileName(folder);
-            foreach (var file in Directory.GetFiles(folder).OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
-            {
-                var name = Path.GetFileName(file);
-                var season = CareerSeasonOfFileName(name, suffixes, prefix);
-                if (season is { } s && s >= pendingSeasonId)
-                    plan.Add((file, folderName + "/" + name));
-            }
-        }
-        var moved = new List<string>();
-        if (plan.Count == 0) return moved;
-
-        var orphans = CareerOrphansFolderFor(historyPath);
-        foreach (var (source, relative) in plan)
-        {
-            try
-            {
-                var target = Path.Combine(orphans, relative.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                var free = target;
-                for (var k = 1; File.Exists(free) || Directory.Exists(free); k++)
-                    free = target + "." + k.ToString(CultureInfo.InvariantCulture);
-                File.Move(source, free, overwrite: false);
-                moved.Add(relative);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
+        if (writesScouting) names.Add(ScoutingFile.PathFor(historyPath, pendingSeasonId));
+        names.Add(MteRecordPathFor(historyPath, pendingSeasonId));
+        names.Add(LeagueStateFile.PathFor(historyPath, pendingSeasonId));
+        foreach (var path in names)
+            if (File.Exists(path) || Directory.Exists(path))
                 throw new InvalidOperationException(
-                    $"SEASON CLOSE REFUSED: could not set aside '{source}' into '{orphans}' — {ex.Message} " +
-                    "Nothing was published; the career is still at its last finished season.", ex);
-            }
-        }
-        return moved;
+                    $"SEASON CLOSE REFUSED: '{path}' is in the way — this season must write a file under that name, and " +
+                    "something the career does not list stands there (it could not be set aside when the career opened, " +
+                    "or it was put there since). Nothing was published; the career is still at its last finished season.");
     }
 
     private static byte[] MteRecordBytes(

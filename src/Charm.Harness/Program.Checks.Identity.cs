@@ -654,24 +654,60 @@ internal static partial class Program
     /// file to prove a READER refuses it by name. Since S125 the career's open refuses any listed file whose
     /// bytes changed after the save (Phase 116 C2), which would stop those checks before the reader runs.
     /// The readers' refusals still matter — they are what catches a file that was SAVED wrong, which no
-    /// hash can — so these checks re-list the career's files at their current bytes (a listed file that is
-    /// gone is dropped from the list) and re-seal the career file: the damage now looks like a file saved
-    /// that way, which is exactly what the reader is there to refuse. A check-only helper; the store has no
-    /// such door.</summary>
+    /// hash can — so these checks re-list the career's files at their current bytes and re-seal the career
+    /// file: the damage now looks like a file saved that way, which is exactly what the reader is there to
+    /// refuse.
+    ///
+    /// <para>★ S126 (K4) — it lists WHAT IS ON DISK: every recognised file of a PUBLISHED season (a log,
+    /// a scouting file, an event record, a league state; never an unfinished log, which no save lists)
+    /// — re-hashing a listed one, dropping a listed one that is gone, and ADDING one present but unlisted
+    /// (a file a check restored or planted). Since S126 nothing reads an unlisted file and the open sets it
+    /// aside, so "the career was saved with exactly these files" must include them. A check-only helper;
+    /// Phase 117 C3 asserts that only the checks call it. The store has no such door.</para></summary>
     private static void RelistCareerForCheck(string careerPath)
     {
         var bytes = File.ReadAllBytes(careerPath);
         var node = System.Text.Json.Nodes.JsonNode.Parse(bytes.AsSpan(0, bytes.Length - 72))!.AsObject();
-        var files = node["files"]!.AsArray();
-        for (var i = files.Count - 1; i >= 0; i--)
+        var nextSeason = (long)node["nextSeasonId"]!;
+        var onDisk = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var kind in new[] { "events", "gamelog", "league" })
         {
-            var listed = (string)files[i]!["path"]!;
-            var onDisk = HistoryStore.ResolveListed(careerPath, listed);
-            if (!File.Exists(onDisk)) { files.RemoveAt(i); continue; }
-            files[i]!["sha256"] = HistoryStore.HashFile(onDisk);
+            var folder = HistoryStore.SiblingFolderFor(careerPath, kind);
+            if (!Directory.Exists(folder)) continue;
+            foreach (var file in Directory.GetFiles(folder))
+            {
+                var listed = kind + "/" + Path.GetFileName(file);
+                if (RelistSeasonOf(listed) is { } n && n < nextSeason) onDisk[listed] = HistoryStore.HashFile(file);
+            }
         }
+        var files = new System.Text.Json.Nodes.JsonArray();
+        foreach (var (listed, sha) in onDisk)
+            files.Add(new System.Text.Json.Nodes.JsonObject { ["path"] = listed, ["sha256"] = sha });
+        node["files"] = files;
         var text = node.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }).Replace("\r\n", "\n") + "\n";
         File.WriteAllBytes(careerPath, SealCareer(text));
+    }
+
+    /// <summary>The season of a name a save lists (the four kinds a close writes), or null. Canonical
+    /// numbers only, as the store's own classifier: no sign, no leading zero; league-0 is season 0.</summary>
+    private static long? RelistSeasonOf(string listed)
+    {
+        static long? Num(string d, bool zero)
+        {
+            if (d.Length == 0 || !d.All(char.IsAsciiDigit)) return null;
+            if (d == "0") return zero ? 0 : null;
+            if (d[0] == '0') return null;
+            return long.TryParse(d, NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : null;
+        }
+        foreach (var (prefix, suffix, zero) in new[]
+                 {
+                     ("events/season-", ".json", false), ("gamelog/season-", ".log", false),
+                     ("gamelog/season-", ".scout", false), ("league/league-", ".json", true),
+                 })
+            if (listed.StartsWith(prefix, StringComparison.Ordinal) && listed.EndsWith(suffix, StringComparison.Ordinal)
+                && listed.Length > prefix.Length + suffix.Length)
+                return Num(listed[prefix.Length..^suffix.Length], zero);
+        return null;
     }
 
     /// <summary>★ S125 — A CAREER FILE PIN THAT HOLDS ON ANY MACHINE. A v4 career file lists the SHA-256 of

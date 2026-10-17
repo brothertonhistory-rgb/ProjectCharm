@@ -327,8 +327,8 @@ internal static partial class Program
         HistoryStore history, long season)
     {
         var none = new Dictionary<(int Lo, int Hi), int>();
-        var path = GameLogWriter.FinalPathFor(history.Path, season);
-        if (!File.Exists(path))
+        var path = history.ListedPath(CareerFileKind.Log, season);   // ★ S126 (K1) — only what the career lists
+        if (path is null || !File.Exists(path))
             return (HostMemory.Empty(HostMemoryStatus.NoPublishedLog, season), none);
 
         // ★ THE PROJECTION. Three fields per game and nothing else crosses this line.

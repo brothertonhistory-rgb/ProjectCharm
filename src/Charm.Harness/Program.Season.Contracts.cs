@@ -153,8 +153,8 @@ internal static partial class Program
         if (history is null) return ContractLoad.Empty(ContractLoadStatus.NoHistory);
         if (pendingSeasonId <= 1) return ContractLoad.Empty(ContractLoadStatus.FirstSeason);
         var seasonId = pendingSeasonId - 1;
-        var path = MteRecordPathFor(history.Path, seasonId);
-        if (!File.Exists(path)) return ContractLoad.Empty(ContractLoadStatus.NoRecord);
+        var path = history.ListedPath(CareerFileKind.EventRecord, seasonId);   // ★ S126 (K1)
+        if (path is null || !File.Exists(path)) return ContractLoad.Empty(ContractLoadStatus.NoRecord);
         try
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(path));

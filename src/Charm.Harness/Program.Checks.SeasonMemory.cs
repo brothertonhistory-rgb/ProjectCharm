@@ -151,6 +151,7 @@ internal static partial class Program
             Directory.CreateDirectory(c2LogDir);
             var c2Candidate = GameLogWriter.FinalPathFor(c2Path, 1);
             File.WriteAllBytes(c2Candidate, new byte[64]);
+            RelistCareerForCheck(c2Path);   // ★ S126 (K4) — saved that way, so the READER is what refuses it
             using (var store = OpenCareer(c2Path, tiny))
             {
                 CheckState("C2d: a candidate too short to hold a header — Truncated",
@@ -158,6 +159,7 @@ internal static partial class Program
                            HostMemoryProblem.Truncated);
             }
             File.WriteAllBytes(c2Candidate, new byte[512]);
+            RelistCareerForCheck(c2Path);   // ★ S126 (K4)
             using (var store = OpenCareer(c2Path, tiny))
             {
                 CheckState("C2e: a full-length candidate that is not a Charm log — UnsupportedVersion",
@@ -646,11 +648,15 @@ internal static partial class Program
             PlayRetainedSeason(memWorld, MemoryGoldenSeed, alienPath, configPath);
             var stranger = Path.Combine(scratch, "stranger", "career.history.json");
             PlayRetainedSeason(memWorld, MemoryGoldenSeed, stranger, configPath);
-            File.Copy(GameLogWriter.FinalPathFor(stranger, 1),
-                      GameLogWriter.FinalPathFor(alienPath, 2));
             using (var store = OpenCareer(alienPath, memWorld))
             {
+                //  ★ S126 — season 2 PUBLISHED by hand, listing the stranger's log: nothing reads a file the
+                //    career does not list, and the open would set an unlisted one aside. So the log is copied
+                //    in after the open and listed as if saved that way; the READER is what refuses it.
+                File.Copy(GameLogWriter.FinalPathFor(stranger, 1),
+                          GameLogWriter.FinalPathFor(alienPath, 2));
                 store.ReserveSeason();      // pretend season 2 happened
+                store.PublishSeason(new[] { GameLogWriter.FinalPathFor(alienPath, 2) }, HandSeasonRules);
                 var alien = ReadHostMemory(store);
                 Check("C8iv: a log from another career at the right path is refused by lineage",
                       alien.Status == HostMemoryStatus.Unreadable

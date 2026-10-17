@@ -27,8 +27,9 @@ namespace Charm.Harness;
 //                     in memory.
 //    AdvanceThrough — writes nothing.
 //    Finish         — every write, in this order, each only for a career season and under
-//                     the same condition as before: (1) set aside any file of this season
-//                     or later left by a close that did not finish, (2) the log, (3) the
+//                     the same condition as before: (1) ★ S126 check that every name it
+//                     will write is free (an unfinished close's files are listed by no save,
+//                     so the career's OPEN set them aside and nothing reads them), (2) the log, (3) the
 //                     scouting file, (4) the event record, written once, (5) ★ S125 the
 //                     season's league state, (6) THE SAVE — the career file listing every
 //                     file above by hash, swapped in with the previous save kept as its
@@ -95,7 +96,7 @@ internal static partial class Program
         private readonly byte[]? eventRecordBody;                         // ★ S124 — the NotPlayed record, built at set-up, written at the close
         private readonly bool keepsLog;                                   // ★ S124 — was `gameLog is not null`
         private readonly List<RosterEntryV2>? logRoster;                  // ★ S124 — the log's roster, built at set-up, written at the close
-        private readonly bool verbose;                                    // ★ S124 — the close prints what it set aside
+        private readonly bool verbose;                                    // the season's printed reports
         private readonly DivvyResult divvy;
         private readonly PeopleSummary? people;
         private readonly DevelopmentStep? development;
@@ -240,15 +241,15 @@ internal static partial class Program
                 careerPeople = ReadCareerPeople(history, world, pendingSeasonId - 1);
             // ★ S121 — THE CAMP'S INPUTS, read at step 1 on the same terms: the Development dials (an
             //   edit that breaks an equation refuses here, before a number is spent) and, on a career's
-            //   second season onward, last season's scouting file — found by the same arithmetic as its
-            //   log. A missing or damaged file refuses by name; potential is never re-rolled.
+            //   second season onward, last season's scouting file — ★ S126 the one the career LISTS.
+            //   A missing or damaged file refuses by name; potential is never re-rolled.
             DevelopmentConfig? devCfg = null;
             IReadOnlyList<ScoutingRecord>? previousScouting = null;
             if (history is not null && retainGameLog)
             {
                 devCfg = DevelopmentConfig.Load(engineConfigPath);
                 if (careerPeople is not null)
-                    previousScouting = ScoutingFile.Read(history.Path, new ScoutingBindings(
+                    previousScouting = ScoutingFile.Read(history.ListedPath(CareerFileKind.Scouting, careerPeople.PreviousSeasonId), new ScoutingBindings(
                         history.HistoryId, history.WorldFingerprint, careerPeople.PreviousSeasonId));
             }
             eventHistory = MteReadHistory(history, pendingSeasonId);
@@ -835,12 +836,12 @@ internal static partial class Program
             return outcome;
         }
 
-        /// <summary>★ S124 (K3), ★ S125 (K6) — every write a career season makes, in this order: the
-        /// set-aside, the log, the scouting file, the event record, the league state, the SAVE. Before
-        /// any of it, the league state on disk is checked against the world (K5). THE COMMIT BOUNDARY:
-        /// the save is the last step that can fail; an exception from it means the career file was not
-        /// replaced, and anything before it leaves the career file exactly as it was — the season is
-        /// played again next run, its stray files set aside first.</summary>
+        /// <summary>★ S124 (K3), ★ S125 (K6), ★ S126 (K3) — every write a career season makes, in this
+        /// order: the names check, the log, the scouting file, the event record, the league state, the
+        /// SAVE. Before any of it, the league state on disk is checked against the world (K5). THE COMMIT
+        /// BOUNDARY: the save is the last step that can fail; an exception from it means the career file
+        /// was not replaced, and anything before it leaves the career file exactly as it was — the season
+        /// is played again next run, its stray files (listed by no save) set aside by that run's open.</summary>
         private void WriteCareerSeason(HistoryStore store, byte[] recordBytes, DateOnly firstLegalDay)
         {
             void Step(string name) => closeStepForTest?.Invoke(name);
@@ -848,11 +849,9 @@ internal static partial class Program
             //  ★ S125 (K5) — the B1 equality assertion at the close, before a single write.
             AssertLeagueMatchesWorld(store, world, "closed");
 
-            Step("set-aside");
-            var setAside = CareerSetAsideUnfinished(store.Path, pendingSeasonId);
-            if (verbose && setAside.Count > 0)
-                Console.WriteLine("  Set aside from a season that did not finish closing (career.orphans): " +
-                                  string.Join(", ", setAside));
+            //  ★ S126 (K3) — every name this close will write is free, checked before any writer runs.
+            Step("names");
+            CareerCheckNamesFree(store.Path, pendingSeasonId, keepsLog, devStates is not null);
 
             var written = new List<string>();
             if (keepsLog)

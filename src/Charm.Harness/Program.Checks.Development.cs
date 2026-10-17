@@ -81,7 +81,8 @@ internal static partial class Program
             IReadOnlyList<ScoutingRecord> ReadScout(WorldFile w, string path, long season)
             {
                 using var store = OpenCareer(path, w);
-                return ScoutingFile.Read(path, new ScoutingBindings(store.HistoryId, store.WorldFingerprint, season));
+                return ScoutingFile.Read(store.ListedPath(CareerFileKind.Scouting, season),   // ★ S126 (K1)
+                                         new ScoutingBindings(store.HistoryId, store.WorldFingerprint, season));
             }
             static string Digest(SeasonRunOutcome run) => RatingSha(string.Concat(run.Results.Select((x, i) =>
                 $"{i}|{x.HomeId}|{x.AwayId}|{x.HomeScore}|{x.AwayScore}|{run.PossessionCounts[i]}\n")));
@@ -709,9 +710,12 @@ internal static partial class Program
             var scoutPath = ScoutingFile.PathFor(negPath, 3);
             var zeroed = readScout(mte, negPath, 3).Select(r => r with { Streaks = new int[r.Streaks.Count] }).ToList();
             File.Delete(scoutPath);
-            RelistCareerForCheck(negPath);   // ★ S125 — the zeroed file below stands in as if saved that way
+            RelistCareerForCheck(negPath);
             using (var store = OpenCareer(negPath, mte))
                 ScoutingFile.Write(negPath, store.HistoryId, store.WorldFingerprint, s3.Schedule[0].SeasonId!.Value, zeroed);
+            //  ★ S126 (K4) — re-listed AFTER the write, so the zeroed file stands in as if saved that way (an unlisted
+            //    file is set aside by the next open and read by nothing).
+            RelistCareerForCheck(negPath);
             var n4 = career(mte, seeds[3], negPath);
             var changed = Enumerable.Range(0, s4.Development.ReturnerCount)
                                     .Count(i => !n4.Development!.Camps[i]!.Points.SequenceEqual(s4.Development.Camps[i]!.Points));
@@ -749,7 +753,7 @@ internal static partial class Program
             ScoutingError? With(byte[] b, ScoutingBindings bb)
             {
                 File.WriteAllBytes(probeFile, b);
-                return Refusal(() => ScoutingFile.Read(probe, bb));
+                return Refusal(() => ScoutingFile.Read(probeFile, bb));
             }
             var damaged = (byte[])bytes.Clone();
             damaged[^5] ^= 0x01;
@@ -762,13 +766,13 @@ internal static partial class Program
                 ("a damaged byte", With(damaged, bind), ScoutingError.Damaged),
                 ("an older version", With(older, bind), ScoutingError.UnsupportedVersion),
                 ("another career's", With(bytes, otherCareer), ScoutingError.HistoryIdMismatch),
-                ("another season's", Refusal(() => ScoutingFile.Read(probe, bind with { SeasonId = 3 })), ScoutingError.SeasonMismatch),
+                ("another season's", Refusal(() => ScoutingFile.Read(asSeason3, bind with { SeasonId = 3 })), ScoutingError.SeasonMismatch),
                 ("a truncated file", With(bytes[..(bytes.Length / 2)], bind), ScoutingError.Damaged),
             };
             check("C4f: ★ a damaged, older-version, other-career, other-season or truncated scouting file is refused by name",
                   results.All(r => r.Got == r.Want), string.Join("; ", results.Select(r => $"{r.Name} -> {r.Got?.ToString() ?? "read"}")));
             var exists = Refusal(() => ScoutingFile.Write(path, store.HistoryId, store.WorldFingerprint, s2.Schedule[0].SeasonId!.Value,
-                                                          ScoutingFile.Read(path, bind)));
+                                                          ScoutingFile.Read(good, bind)));
             check("C4g: an existing scouting file is never overwritten", exists == ScoutingError.AlreadyExists
                   && File.ReadAllBytes(good).SequenceEqual(bytes), exists?.ToString() ?? "(written)");
         }
